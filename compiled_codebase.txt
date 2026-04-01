@@ -3,7 +3,7 @@ GODOT CODEBASE EXPORT
 
 EXPORT_METADATA
 ---------------
-Generated at: 2026-04-01T16:52:54
+Generated at: 2026-04-02T01:54:55
 Root path: res://
 Output file: res://compiled_codebase.txt
 Included file count: 7
@@ -166,11 +166,11 @@ Counts by extension:
 
 Files:
 - res://project.godot | 626 bytes
-- res://scenes/main.tscn | 896 bytes
+- res://scenes/main.tscn | 2564 bytes
 - res://scenes/player.tscn | 24357 bytes
-- res://scripts/MinecraftRig.gd | 13371 bytes
+- res://scripts/MinecraftRig.gd | 17393 bytes
 - res://scripts/WorldGenerator.gd | 974 bytes
-- res://scripts/player.gd | 4840 bytes
+- res://scripts/player.gd | 9615 bytes
 - res://scripts/skin_picker.gd | 3657 bytes
 
 [SCRIPT_SUMMARIES]
@@ -180,8 +180,8 @@ Files:
 - class_name: MinecraftRig
 - tool: yes
 - exports: @export var skin_model: SkinModel:, @export_file("*.png") var skin_path: String:, @export var show_outer_layer := true:, @export var rebuild_now := false:
-- functions: _ready, _queue_rebuild, _rebuild, _ensure_materials, _ensure_model_root, _clear_model_root, _build_parts, _create_part, _mesh_offset_for_pivot, _build_cuboid, _add_quad, _add_vertex, _rect_to_uv_clockwise, load_skin_from_file, _load_skin_texture, _apply_texture, _apply_outer_visibility, _make_fallback_skin, _process, _head_uv, _body_uv, _right_leg_uv, _left_leg_uv, _right_arm_uv, _left_arm_uv
-- path_refs: res://
+- functions: _ready, _queue_rebuild, _rebuild, _ensure_materials, _ensure_model_root, _clear_model_root, _build_parts, _cache_rest_pose, _animate_part, _create_part, _mesh_offset_for_pivot, _build_cuboid, _add_quad, _add_vertex, _rect_to_uv_clockwise, load_skin_from_file, _load_skin_texture, _apply_texture, _apply_outer_visibility, _make_fallback_skin, _process, _head_uv, _body_uv, _right_leg_uv, _left_leg_uv, _right_arm_uv, _left_arm_uv
+- path_refs: res://, res://skin.png
 
 ===SCRIPT: res://scripts/WorldGenerator.gd===
 - extends: Node3D
@@ -192,7 +192,7 @@ Files:
 ===SCRIPT: res://scripts/player.gd===
 - extends: CharacterBody3D
 - tool: no
-- functions: _ready, _spawn_ui, _unhandled_input, _physics_process, _get_input_direction, cycle_camera_mode, set_camera_mode, get_camera_mode_name
+- functions: _ready, _spawn_ui, _refresh_camera_ui, _unhandled_input, _physics_process, _update_freecam, _update_follow_movement, _update_follow_camera, _apply_follow_camera_transform, _resolve_camera_collision, _get_pitch_squeeze, _get_input_direction, _clamp_player_to_platform, cycle_camera_mode, set_camera_mode, get_camera_mode_name
 - path_refs: res://scripts/skin_picker.gd
 
 ===SCRIPT: res://scripts/skin_picker.gd===
@@ -204,11 +204,12 @@ Files:
 [SCENE_SUMMARIES]
 
 ===SCENE: res://scenes/main.tscn===
-- node_count: 4
+- node_count: 5
 - root_name: World
 - root_type: Node3D
 - node_tree:
   - World (Node3D)
+    - WorldEnvironment (WorldEnvironment)
     - DirectionalLight3D (DirectionalLight3D)
     - Ground (CSGBox3D)
     - Player ()
@@ -280,12 +281,70 @@ renderer/rendering_method.mobile="gl_compatibility"
 [ext_resource type="PackedScene" uid="uid://wvmdc0hnjr3m" path="res://scenes/player.tscn" id="1_player"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_grass"]
-albedo_color = Color(0.3, 0.7, 0.3, 1)
+albedo_color = Color(0.36, 0.76, 0.38, 1)
+roughness = 1.0
+metallic_specular = 0.0
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
+energy_multiplier = 1.05
+sky_top_color = Color(0.172549, 0.447059, 0.886275, 1)
+sky_horizon_color = Color(0.745098, 0.905882, 1, 1)
+ground_horizon_color = Color(0.745098, 0.905882, 1, 1)
+ground_bottom_color = Color(0.560784, 0.815686, 0.988235, 1)
+sky_curve = 0.2
+ground_curve = 0.14
+sun_angle_max = 25.0
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("ProceduralSkyMaterial_main")
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 2
+sky = SubResource("Sky_main")
+ambient_light_color = Color(0.803922, 0.882353, 0.980392, 1)
+ambient_light_energy = 0.55
+ambient_light_sky_contribution = 0.75
+ambient_light_source = 3
+reflected_light_source = 2
+tonemap_mode = 2
+tonemap_exposure = 1.05
+tonemap_white = 4.0
+fog_enabled = true
+fog_mode = 1
+fog_density = 0.12
+fog_depth_begin = 10.0
+fog_depth_end = 40.0
+fog_depth_curve = 1.35
+fog_aerial_perspective = 1.0
+fog_light_color = Color(0.745098, 0.890196, 1, 1)
+fog_light_energy = 0.7
+fog_sun_scatter = 0.12
+glow_enabled = true
+glow_bloom = 0.08
+glow_hdr_threshold = 1.0
+glow_hdr_scale = 1.4
+glow_intensity = 0.3
+glow_levels/2 = 0.45
+glow_levels/3 = 0.2
+adjustment_enabled = true
+adjustment_brightness = 1.02
+adjustment_contrast = 1.05
+adjustment_saturation = 1.06
 
 [node name="World" type="Node3D" unique_id=173874473]
 
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2083213727]
 transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 10, 0)
+light_energy = 1.1
+shadow_enabled = true
+shadow_opacity = 0.75
+shadow_blur = 0.25
+directional_shadow_mode = 2
+directional_shadow_max_distance = 30.0
+directional_shadow_fade_start = 1.0
 
 [node name="Ground" type="CSGBox3D" parent="." unique_id=89236639]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
@@ -473,7 +532,7 @@ var _skin_model: SkinModel = SkinModel.CLASSIC
 		_skin_model = value
 		_queue_rebuild()
 
-var _skin_path: String = ""
+var _skin_path: String = "res://skin.png"
 @export_file("*.png") var skin_path: String:
 	get:
 		return _skin_path
@@ -509,6 +568,18 @@ var arm_r: Node3D
 var leg_l: Node3D
 var leg_r: Node3D
 
+var _head_rest_position := Vector3.ZERO
+var _body_rest_position := Vector3.ZERO
+var _arm_l_rest_position := Vector3.ZERO
+var _arm_r_rest_position := Vector3.ZERO
+var _leg_l_rest_position := Vector3.ZERO
+var _leg_r_rest_position := Vector3.ZERO
+
+var _idle_time := 0.0
+var _walk_time := 0.0
+var _smoothed_speed := 0.0
+var _pose_ready := false
+
 var _outer_meshes: Array[MeshInstance3D] = []
 var _rebuild_queued := false
 
@@ -538,6 +609,7 @@ func _rebuild() -> void:
 	material_outer.albedo_texture = skin_texture
 
 	_build_parts()
+	_cache_rest_pose()
 	_apply_outer_visibility()
 
 func _ensure_materials() -> void:
@@ -566,6 +638,7 @@ func _ensure_model_root() -> void:
 
 func _clear_model_root() -> void:
 	_outer_meshes.clear()
+	_pose_ready = false
 
 	for child in model_root.get_children():
 		child.free()
@@ -640,6 +713,33 @@ func _build_parts() -> void:
 		BODY_OUTER_INFLATE_PX
 	)
 	arm_l.position = Vector3(shoulder_x_px * PX, 24.0 * PX, 0.0)
+
+func _cache_rest_pose() -> void:
+	if head == null or body == null or arm_l == null or arm_r == null or leg_l == null or leg_r == null:
+		_pose_ready = false
+		return
+
+	_head_rest_position = head.position
+	_body_rest_position = body.position
+	_arm_l_rest_position = arm_l.position
+	_arm_r_rest_position = arm_r.position
+	_leg_l_rest_position = leg_l.position
+	_leg_r_rest_position = leg_r.position
+
+	head.rotation = Vector3.ZERO
+	body.rotation = Vector3.ZERO
+	arm_l.rotation = Vector3.ZERO
+	arm_r.rotation = Vector3.ZERO
+	leg_l.rotation = Vector3.ZERO
+	leg_r.rotation = Vector3.ZERO
+
+	_pose_ready = true
+
+func _animate_part(part: Node3D, target_rotation: Vector3, target_position: Vector3, blend: float) -> void:
+	part.rotation.x = lerp_angle(part.rotation.x, target_rotation.x, blend)
+	part.rotation.y = lerp_angle(part.rotation.y, target_rotation.y, blend)
+	part.rotation.z = lerp_angle(part.rotation.z, target_rotation.z, blend)
+	part.position = part.position.lerp(target_position, blend)
 
 func _create_part(
 	part_name: String,
@@ -857,32 +957,95 @@ func _make_fallback_skin() -> Image:
 	image.fill(Color(0.6, 0.4, 0.2, 1.0)) # Plain brown default skin!
 	return image
 
-# We'll use '_process' from our original script to retain the walking motion!
-var time := 0.0
 func _process(delta: float) -> void:
-	if Engine.is_editor_hint(): return
-	if not is_instance_valid(get_parent()): return
-	
-	# Fallback if no parts exist yet
-	if arm_l == null or arm_r == null or leg_l == null or leg_r == null: return
-	
-	var velocity: Vector3 = get_parent().get("velocity")
-	if velocity == null: return
-	
-	var speed_sq = velocity.x * velocity.x + velocity.z * velocity.z
-	if speed_sq > 0.1:
-		time += delta * sqrt(speed_sq) * 1.5
-		var swing = sin(time) * 1.0
-		arm_l.rotation.x = swing
-		arm_r.rotation.x = -swing
-		leg_l.rotation.x = -swing
-		leg_r.rotation.x = swing
-	else:
-		var reset = delta * 15.0
-		arm_l.rotation.x = lerp_angle(arm_l.rotation.x, 0.0, reset)
-		arm_r.rotation.x = lerp_angle(arm_r.rotation.x, 0.0, reset)
-		leg_l.rotation.x = lerp_angle(leg_l.rotation.x, 0.0, reset)
-		leg_r.rotation.x = lerp_angle(leg_r.rotation.x, 0.0, reset)
+	if Engine.is_editor_hint():
+		return
+	if not is_instance_valid(get_parent()):
+		return
+	if not _pose_ready:
+		return
+	if head == null or body == null or arm_l == null or arm_r == null or leg_l == null or leg_r == null:
+		return
+
+	var velocity_value = get_parent().get("velocity")
+	if typeof(velocity_value) != TYPE_VECTOR3:
+		return
+
+	var velocity: Vector3 = velocity_value
+	var horizontal_velocity: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+	var horizontal_speed: float = horizontal_velocity.length()
+
+	_idle_time += delta
+	_smoothed_speed = lerpf(_smoothed_speed, horizontal_speed, min(1.0, delta * 10.0))
+
+	var speed_ratio: float = clamp(_smoothed_speed / 6.0, 0.0, 1.0)
+	var move_weight: float = clamp(_smoothed_speed / 3.5, 0.0, 1.0)
+	var idle_weight: float = 1.0 - move_weight
+
+	_walk_time += delta * lerpf(2.0, 10.5, speed_ratio)
+
+	var local_velocity: Vector3 = get_parent().global_transform.basis.inverse() * horizontal_velocity
+	var walk_direction: float = 1.0
+	if local_velocity.z > 0.05:
+		walk_direction = -1.0
+
+	var strafe_amount: float = 0.0
+	if _smoothed_speed > 0.001:
+		strafe_amount = clamp(local_velocity.x / _smoothed_speed, -1.0, 1.0)
+
+	var walk_sin: float = sin(_walk_time)
+	var walk_cos: float = cos(_walk_time)
+	var step_bounce: float = abs(walk_cos)
+
+	var idle_bob: float = sin(_idle_time * 2.0) * 0.02 * idle_weight
+	var idle_breath: float = sin(_idle_time * 1.6) * 0.025 * idle_weight
+	var idle_sway: float = sin(_idle_time * 1.1) * 0.03 * idle_weight
+
+	var body_position := _body_rest_position + Vector3(0.0, idle_bob + step_bounce * 0.025 * move_weight, 0.0)
+	var head_position := _head_rest_position + Vector3(0.0, idle_bob * 1.2 + step_bounce * 0.015 * move_weight, 0.0)
+	var arm_l_position := _arm_l_rest_position + Vector3(0.0, idle_bob * 0.35, 0.0)
+	var arm_r_position := _arm_r_rest_position + Vector3(0.0, idle_bob * 0.35, 0.0)
+	var leg_l_position := _leg_l_rest_position
+	var leg_r_position := _leg_r_rest_position
+
+	var arm_swing: float = walk_sin * 0.95 * move_weight * walk_direction
+	var leg_swing: float = walk_sin * 1.2 * move_weight * walk_direction
+	var body_roll: float = (-strafe_amount * 0.12 * move_weight) + idle_sway * 0.25
+	var head_roll: float = -idle_sway * 0.18
+	var arm_yaw: float = strafe_amount * 0.08 * move_weight
+	var leg_roll: float = strafe_amount * 0.06 * move_weight
+
+	var body_rotation := Vector3(
+		idle_breath + step_bounce * 0.04 * move_weight,
+		0.0,
+		body_roll
+	)
+	var head_rotation := Vector3(
+		idle_breath * 0.8 - step_bounce * 0.02 * move_weight,
+		arm_yaw * 0.8,
+		head_roll
+	)
+	var arm_l_rotation: float = arm_swing
+	var arm_r_rotation: float = -arm_swing
+	var leg_l_rotation: float = -leg_swing
+	var leg_r_rotation: float = leg_swing
+
+	if move_weight < 0.05:
+		arm_l_rotation = 0.0
+		arm_r_rotation = 0.0
+		leg_l_rotation = 0.0
+		leg_r_rotation = 0.0
+		body_rotation = Vector3(idle_breath, 0.0, idle_sway * 0.25)
+		head_rotation = Vector3(idle_breath * 0.8, 0.0, -idle_sway * 0.18)
+
+	var blend: float = min(1.0, delta * lerpf(6.0, 14.0, move_weight))
+
+	_animate_part(body, body_rotation, body_position, blend)
+	_animate_part(head, head_rotation, head_position, blend)
+	_animate_part(arm_l, Vector3(arm_l_rotation, arm_yaw, -0.08 if move_weight >= 0.05 else 0.0), arm_l_position, blend)
+	_animate_part(arm_r, Vector3(arm_r_rotation, arm_yaw, 0.08 if move_weight >= 0.05 else 0.0), arm_r_position, blend)
+	_animate_part(leg_l, Vector3(leg_l_rotation, 0.0, leg_roll), leg_l_position, blend)
+	_animate_part(leg_r, Vector3(leg_r_rotation, 0.0, leg_roll), leg_r_position, blend)
 
 func _head_uv(base_layer: bool) -> Dictionary:
 	var ox := 0 if base_layer else 32
@@ -1024,13 +1187,45 @@ enum CameraMode {
 const SPEED: float = 5.0
 const FAST_SPEED: float = 15.0
 const CAMERA_HEIGHT: float = 1.5
-const THIRD_PERSON_DISTANCE: float = 4.0
+const FREECAM_START_OFFSET := Vector3(0.0, 1.5, 3.0)
+
+const THIRD_PERSON_DISTANCE: float = 3.6
 const FIRST_PERSON_DISTANCE: float = 0.0
+const THIRD_PERSON_OFFSET := Vector2(0.65, 0.18)
+
 const MIN_PITCH: float = -1.55
 const MAX_PITCH: float = 1.55
+const PLATFORM_HALF_SIZE: float = 5.0
+const PLATFORM_MARGIN: float = 0.45
+
+const CAMERA_DISTANCE_SMOOTH: float = 10.0
+const CAMERA_OFFSET_SMOOTH: float = 10.0
+const BODY_TURN_SMOOTH: float = 10.0
+
+const CAMERA_COLLISION_MARGIN: float = 0.12
+const CAMERA_COLLISION_SAMPLE_RADIUS: float = 0.18
+const CAMERA_PITCH_SQUEEZE_THRESHOLD: float = 0.9599311 # 55 degrees in radians
+
+const CAMERA_COLLISION_SAMPLES := [
+	Vector3.ZERO,
+	Vector3(1, 0, 0),
+	Vector3(-1, 0, 0),
+	Vector3(0, 1, 0),
+	Vector3(0, -1, 0),
+	Vector3(0, 0, 1),
+	Vector3(0, 0, -1),
+]
 
 var sensitivity: float = 0.005
-var camera_mode: CameraMode = CameraMode.FREECAM
+var camera_mode: int = -1
+
+var camera_yaw: float = 0.0
+var camera_pitch: float = 0.0
+
+var smoothed_camera_distance: float = THIRD_PERSON_DISTANCE
+var smoothed_camera_offset: Vector2 = Vector2.ZERO
+
+var skin_ui: SkinPicker
 
 @onready var rig: MinecraftRig = $MinecraftRig
 @onready var camera_pivot: Node3D = $CameraPivot
@@ -1040,121 +1235,246 @@ var camera_mode: CameraMode = CameraMode.FREECAM
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_spawn_ui()
-	set_camera_mode(CameraMode.FREECAM)
+
+	camera_yaw = rotation.y
+	camera_pitch = 0.0
+
+	camera_pivot.top_level = true
+	camera_pivot.global_position = global_position + FREECAM_START_OFFSET
+	camera_pivot.global_rotation = Vector3(camera_pitch, camera_yaw, 0.0)
+
+	spring_arm.spring_length = 0.0
+	camera.transform = Transform3D.IDENTITY
+	camera_mode = CameraMode.FREECAM
+	rig.visible = true
+
+	_refresh_camera_ui()
 
 func _spawn_ui() -> void:
-	var skin_ui = preload("res://scripts/skin_picker.gd").new()
+	skin_ui = preload("res://scripts/skin_picker.gd").new()
 	skin_ui.rig_node = rig
 	skin_ui.player_node = self
-	# Delaying UI spawn slightly ensures rig_node is fully ready to be accessed
 	add_child(skin_ui)
+
+func _refresh_camera_ui() -> void:
+	if skin_ui != null:
+		skin_ui.call("_refresh_ui")
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		var motion: InputEventMouseMotion = event as InputEventMouseMotion
 
-		if camera_mode == CameraMode.FREECAM:
-			camera_pivot.rotate_y(-motion.relative.x * sensitivity)
-			var next_pitch: float = camera_pivot.rotation.x - motion.relative.y * sensitivity
-			camera_pivot.rotation.x = clamp(next_pitch, MIN_PITCH, MAX_PITCH)
-			camera_pivot.rotation.z = 0.0
-		else:
-			# In follow modes, rotate the player body for Y, and pivot for X (pitch)
-			rotate_y(-motion.relative.x * sensitivity)
-			var next_pitch: float = camera_pivot.rotation.x - motion.relative.y * sensitivity
-			camera_pivot.rotation.x = clamp(next_pitch, MIN_PITCH, MAX_PITCH)
-			camera_pivot.rotation.y = 0.0
-			camera_pivot.rotation.z = 0.0
+		camera_yaw = wrapf(camera_yaw - motion.relative.x * sensitivity, -PI, PI)
+		camera_pitch = clamp(camera_pitch - motion.relative.y * sensitivity, MIN_PITCH, MAX_PITCH)
 
-	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		else:
-			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		if camera_mode == CameraMode.FREECAM:
+			camera_pivot.global_rotation = Vector3(camera_pitch, camera_yaw, 0.0)
+
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F5:
+			cycle_camera_mode()
+		elif event.keycode == KEY_ESCAPE:
+			if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+				Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+			else:
+				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _physics_process(delta: float) -> void:
 	var input_dir: Vector3 = _get_input_direction()
 	var speed: float = FAST_SPEED if Input.is_key_pressed(KEY_SHIFT) else SPEED
 
 	if camera_mode == CameraMode.FREECAM:
-		# In freecam, move independent of player orientation
-		var move_dir: Vector3 = (
-			camera_pivot.global_transform.basis.x * input_dir.x
-			+ camera_pivot.global_transform.basis.y * input_dir.y
-			+ camera_pivot.global_transform.basis.z * input_dir.z
-		)
-
-		if move_dir.length() > 0.01:
-			move_dir = move_dir.normalized()
-
-		camera_pivot.global_position += move_dir * speed * delta
-		velocity = Vector3.ZERO
+		_update_freecam(delta, input_dir, speed)
 		return
 
-	# In Third/First person, move relative to player's current ground-plane orientation
-	var follow_move_dir: Vector3 = (
-		global_transform.basis.x * input_dir.x
-		+ Vector3.UP * input_dir.y
-		+ global_transform.basis.z * input_dir.z
+	_update_follow_movement(delta, input_dir, speed)
+	_update_follow_camera(delta)
+
+func _update_freecam(delta: float, input_dir: Vector3, speed: float) -> void:
+	var camera_basis := Basis.from_euler(Vector3(camera_pitch, camera_yaw, 0.0))
+	var move_dir := (
+		camera_basis.x * input_dir.x
+		+ camera_basis.y * input_dir.y
+		+ camera_basis.z * input_dir.z
 	)
 
-	if follow_move_dir.length() > 0.01:
-		follow_move_dir = follow_move_dir.normalized()
+	if move_dir.length() > 0.01:
+		move_dir = move_dir.normalized()
 
-	velocity = follow_move_dir * speed
+	camera_pivot.global_position += move_dir * speed * delta
+	camera_pivot.global_rotation = Vector3(camera_pitch, camera_yaw, 0.0)
+	velocity = Vector3.ZERO
+
+func _update_follow_movement(delta: float, input_dir: Vector3, speed: float) -> void:
+	var flat_camera_basis := Basis.from_euler(Vector3(0.0, camera_yaw, 0.0))
+	var move_dir := (
+		flat_camera_basis.x * input_dir.x
+		+ Vector3.UP * input_dir.y
+		+ flat_camera_basis.z * input_dir.z
+	)
+
+	if move_dir.length() > 0.01:
+		move_dir = move_dir.normalized()
+
+	velocity = move_dir * speed
 	move_and_slide()
+	_clamp_player_to_platform()
+
+	if camera_mode == CameraMode.FIRSTPERSON:
+		rotation.y = lerp_angle(rotation.y, camera_yaw, min(1.0, delta * BODY_TURN_SMOOTH))
+	elif Vector2(velocity.x, velocity.z).length() > 0.05:
+		var target_body_yaw := atan2(-velocity.x, -velocity.z)
+		rotation.y = lerp_angle(rotation.y, target_body_yaw, min(1.0, delta * BODY_TURN_SMOOTH))
+
+func _update_follow_camera(delta: float) -> void:
+	var target_distance := THIRD_PERSON_DISTANCE if camera_mode == CameraMode.THIRDPERSON else FIRST_PERSON_DISTANCE
+	var target_offset := THIRD_PERSON_OFFSET * _get_pitch_squeeze(camera_pitch) if camera_mode == CameraMode.THIRDPERSON else Vector2.ZERO
+
+	var distance_blend: float = min(1.0, delta * CAMERA_DISTANCE_SMOOTH)
+	var offset_blend: float = min(1.0, delta * CAMERA_OFFSET_SMOOTH)
+
+	smoothed_camera_distance = lerpf(smoothed_camera_distance, target_distance, distance_blend)
+	smoothed_camera_offset = smoothed_camera_offset.lerp(target_offset, offset_blend)
+
+	_apply_follow_camera_transform(smoothed_camera_offset, smoothed_camera_distance)
+
+func _apply_follow_camera_transform(offset: Vector2, distance: float) -> void:
+	camera_pivot.top_level = false
+	camera_pivot.position = Vector3(0.0, CAMERA_HEIGHT, 0.0)
+	camera_pivot.rotation = Vector3.ZERO
+	spring_arm.spring_length = 0.0
+
+	var anchor: Vector3 = camera_pivot.global_position
+	var camera_basis := Basis.from_euler(Vector3(camera_pitch, camera_yaw, 0.0)).orthonormalized()
+	var desired_vector := (
+		camera_basis.x * offset.x
+		+ camera_basis.y * offset.y
+		+ camera_basis.z * distance
+	)
+
+	var actual_vector := _resolve_camera_collision(anchor, desired_vector)
+	var camera_position := anchor + actual_vector
+
+	camera.global_transform = Transform3D(camera_basis, camera_position)
+
+func _resolve_camera_collision(anchor: Vector3, desired_vector: Vector3) -> Vector3:
+	var desired_distance := desired_vector.length()
+	if desired_distance <= 0.001:
+		return desired_vector
+
+	var space_state := get_world_3d().direct_space_state
+	var limit_distance := desired_distance
+
+	for sample in CAMERA_COLLISION_SAMPLES:
+		var sample_offset: Vector3 = sample * CAMERA_COLLISION_SAMPLE_RADIUS
+		var from: Vector3 = anchor + sample_offset
+		var to: Vector3 = from + desired_vector
+
+		var query := PhysicsRayQueryParameters3D.create(from, to)
+		query.exclude = [get_rid()]
+		query.collide_with_areas = false
+		query.collide_with_bodies = true
+
+		var result := space_state.intersect_ray(query)
+		if not result.is_empty():
+			var hit_position: Vector3 = result["position"]
+			var hit_distance: float = from.distance_to(hit_position) - CAMERA_COLLISION_MARGIN
+			limit_distance = min(limit_distance, max(hit_distance, 0.0))
+
+	return desired_vector.normalized() * limit_distance
+
+func _get_pitch_squeeze(pitch: float) -> float:
+	var abs_pitch: float = abs(pitch)
+	if abs_pitch <= CAMERA_PITCH_SQUEEZE_THRESHOLD:
+		return 1.0
+
+	return clamp(
+		(PI * 0.5 - abs_pitch) / (PI * 0.5 - CAMERA_PITCH_SQUEEZE_THRESHOLD),
+		0.0,
+		1.0
+	)
 
 func _get_input_direction() -> Vector3:
 	var input_dir: Vector3 = Vector3.ZERO
-	if Input.is_key_pressed(KEY_W): input_dir.z -= 1.0
-	if Input.is_key_pressed(KEY_S): input_dir.z += 1.0
-	if Input.is_key_pressed(KEY_A): input_dir.x -= 1.0
-	if Input.is_key_pressed(KEY_D): input_dir.x += 1.0
-	if Input.is_key_pressed(KEY_E): input_dir.y += 1.0
-	if Input.is_key_pressed(KEY_Q): input_dir.y -= 1.0
+	if Input.is_key_pressed(KEY_W):
+		input_dir.z -= 1.0
+	if Input.is_key_pressed(KEY_S):
+		input_dir.z += 1.0
+	if Input.is_key_pressed(KEY_A):
+		input_dir.x -= 1.0
+	if Input.is_key_pressed(KEY_D):
+		input_dir.x += 1.0
+	if Input.is_key_pressed(KEY_E):
+		input_dir.y += 1.0
+	if Input.is_key_pressed(KEY_Q):
+		input_dir.y -= 1.0
 	return input_dir
 
-func cycle_camera_mode() -> void:
-	var next_mode: int = (int(camera_mode) + 1) % 3
-	set_camera_mode(next_mode as CameraMode)
+func _clamp_player_to_platform() -> void:
+	var min_x: float = -PLATFORM_HALF_SIZE + PLATFORM_MARGIN
+	var max_x: float = PLATFORM_HALF_SIZE - PLATFORM_MARGIN
+	var min_z: float = -PLATFORM_HALF_SIZE + PLATFORM_MARGIN
+	var max_z: float = PLATFORM_HALF_SIZE - PLATFORM_MARGIN
 
-func set_camera_mode(mode: CameraMode) -> void:
-	if mode == CameraMode.FREECAM:
-		var current_camera_transform: Transform3D = camera.global_transform
-		camera_mode = mode
-		camera_pivot.top_level = true
-		camera_pivot.global_transform = current_camera_transform
-		spring_arm.spring_length = 0.0
-		rig.visible = true
+	global_position.x = clamp(global_position.x, min_x, max_x)
+	global_position.z = clamp(global_position.z, min_z, max_z)
+
+func cycle_camera_mode() -> void:
+	var next_mode: int = (camera_mode + 1) % 3
+	set_camera_mode(next_mode)
+
+func set_camera_mode(mode: int) -> void:
+	if mode == camera_mode:
 		return
 
-	var pitch: float = camera_pivot.global_rotation.x
-	var yaw: float = camera_pivot.global_rotation.y
+	if mode == CameraMode.FREECAM:
+		camera_mode = CameraMode.FREECAM
+		rig.visible = true
+
+		camera_pivot.top_level = true
+		camera_pivot.global_position = camera.global_position
+		camera_pivot.global_rotation = Vector3(camera_pitch, camera_yaw, 0.0)
+
+		spring_arm.spring_length = 0.0
+		camera.transform = Transform3D.IDENTITY
+
+		_refresh_camera_ui()
+		return
 
 	if camera_mode == CameraMode.FREECAM:
-		# Snap player back to where the camera is!
-		global_position = camera_pivot.global_position - Vector3(0.0, CAMERA_HEIGHT, 0.0)
+		camera_yaw = wrapf(camera_pivot.global_rotation.y, -PI, PI)
+		camera_pitch = clamp(camera_pivot.global_rotation.x, MIN_PITCH, MAX_PITCH)
 
 	camera_mode = mode
-	rotation.y = yaw
-
 	camera_pivot.top_level = false
 	camera_pivot.position = Vector3(0.0, CAMERA_HEIGHT, 0.0)
-	camera_pivot.rotation = Vector3(clamp(pitch, MIN_PITCH, MAX_PITCH), 0.0, 0.0)
+	camera_pivot.rotation = Vector3.ZERO
+	spring_arm.spring_length = 0.0
 
-	if camera_mode == CameraMode.THIRDPERSON:
-		spring_arm.spring_length = THIRD_PERSON_DISTANCE
-		rig.visible = true
-	else:
-		spring_arm.spring_length = FIRST_PERSON_DISTANCE
+	if camera_mode == CameraMode.FIRSTPERSON:
+		rotation.y = camera_yaw
 		rig.visible = false
+		smoothed_camera_distance = FIRST_PERSON_DISTANCE
+		smoothed_camera_offset = Vector2.ZERO
+	else:
+		rig.visible = true
+		smoothed_camera_distance = THIRD_PERSON_DISTANCE
+		smoothed_camera_offset = THIRD_PERSON_OFFSET * _get_pitch_squeeze(camera_pitch)
+
+	_apply_follow_camera_transform(smoothed_camera_offset, smoothed_camera_distance)
+	_clamp_player_to_platform()
+	_refresh_camera_ui()
 
 func get_camera_mode_name() -> String:
 	match camera_mode:
-		CameraMode.FREECAM: return "Freecam"
-		CameraMode.THIRDPERSON: return "Thirdperson"
-		CameraMode.FIRSTPERSON: return "Firstperson"
-		_: return "Unknown"
+		CameraMode.FREECAM:
+			return "Freecam"
+		CameraMode.THIRDPERSON:
+			return "Thirdperson"
+		CameraMode.FIRSTPERSON:
+			return "Firstperson"
+		_:
+			return "Unknown"
 ===END_FILE===
 
 ===FILE: res://scripts/skin_picker.gd===

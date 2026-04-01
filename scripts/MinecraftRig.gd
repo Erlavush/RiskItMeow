@@ -27,7 +27,7 @@ var _skin_model: SkinModel = SkinModel.CLASSIC
 		_skin_model = value
 		_queue_rebuild()
 
-var _skin_path: String = ""
+var _skin_path: String = "res://skin.png"
 @export_file("*.png") var skin_path: String:
 	get:
 		return _skin_path
@@ -63,6 +63,18 @@ var arm_r: Node3D
 var leg_l: Node3D
 var leg_r: Node3D
 
+var _head_rest_position := Vector3.ZERO
+var _body_rest_position := Vector3.ZERO
+var _arm_l_rest_position := Vector3.ZERO
+var _arm_r_rest_position := Vector3.ZERO
+var _leg_l_rest_position := Vector3.ZERO
+var _leg_r_rest_position := Vector3.ZERO
+
+var _idle_time := 0.0
+var _walk_time := 0.0
+var _smoothed_speed := 0.0
+var _pose_ready := false
+
 var _outer_meshes: Array[MeshInstance3D] = []
 var _rebuild_queued := false
 
@@ -92,6 +104,7 @@ func _rebuild() -> void:
 	material_outer.albedo_texture = skin_texture
 
 	_build_parts()
+	_cache_rest_pose()
 	_apply_outer_visibility()
 
 func _ensure_materials() -> void:
@@ -120,6 +133,7 @@ func _ensure_model_root() -> void:
 
 func _clear_model_root() -> void:
 	_outer_meshes.clear()
+	_pose_ready = false
 
 	for child in model_root.get_children():
 		child.free()
@@ -194,6 +208,33 @@ func _build_parts() -> void:
 		BODY_OUTER_INFLATE_PX
 	)
 	arm_l.position = Vector3(shoulder_x_px * PX, 24.0 * PX, 0.0)
+
+func _cache_rest_pose() -> void:
+	if head == null or body == null or arm_l == null or arm_r == null or leg_l == null or leg_r == null:
+		_pose_ready = false
+		return
+
+	_head_rest_position = head.position
+	_body_rest_position = body.position
+	_arm_l_rest_position = arm_l.position
+	_arm_r_rest_position = arm_r.position
+	_leg_l_rest_position = leg_l.position
+	_leg_r_rest_position = leg_r.position
+
+	head.rotation = Vector3.ZERO
+	body.rotation = Vector3.ZERO
+	arm_l.rotation = Vector3.ZERO
+	arm_r.rotation = Vector3.ZERO
+	leg_l.rotation = Vector3.ZERO
+	leg_r.rotation = Vector3.ZERO
+
+	_pose_ready = true
+
+func _animate_part(part: Node3D, target_rotation: Vector3, target_position: Vector3, blend: float) -> void:
+	part.rotation.x = lerp_angle(part.rotation.x, target_rotation.x, blend)
+	part.rotation.y = lerp_angle(part.rotation.y, target_rotation.y, blend)
+	part.rotation.z = lerp_angle(part.rotation.z, target_rotation.z, blend)
+	part.position = part.position.lerp(target_position, blend)
 
 func _create_part(
 	part_name: String,
@@ -411,32 +452,95 @@ func _make_fallback_skin() -> Image:
 	image.fill(Color(0.6, 0.4, 0.2, 1.0)) # Plain brown default skin!
 	return image
 
-# We'll use '_process' from our original script to retain the walking motion!
-var time := 0.0
 func _process(delta: float) -> void:
-	if Engine.is_editor_hint(): return
-	if not is_instance_valid(get_parent()): return
-	
-	# Fallback if no parts exist yet
-	if arm_l == null or arm_r == null or leg_l == null or leg_r == null: return
-	
-	var velocity: Vector3 = get_parent().get("velocity")
-	if velocity == null: return
-	
-	var speed_sq = velocity.x * velocity.x + velocity.z * velocity.z
-	if speed_sq > 0.1:
-		time += delta * sqrt(speed_sq) * 1.5
-		var swing = sin(time) * 1.0
-		arm_l.rotation.x = swing
-		arm_r.rotation.x = -swing
-		leg_l.rotation.x = -swing
-		leg_r.rotation.x = swing
-	else:
-		var reset = delta * 15.0
-		arm_l.rotation.x = lerp_angle(arm_l.rotation.x, 0.0, reset)
-		arm_r.rotation.x = lerp_angle(arm_r.rotation.x, 0.0, reset)
-		leg_l.rotation.x = lerp_angle(leg_l.rotation.x, 0.0, reset)
-		leg_r.rotation.x = lerp_angle(leg_r.rotation.x, 0.0, reset)
+	if Engine.is_editor_hint():
+		return
+	if not is_instance_valid(get_parent()):
+		return
+	if not _pose_ready:
+		return
+	if head == null or body == null or arm_l == null or arm_r == null or leg_l == null or leg_r == null:
+		return
+
+	var velocity_value = get_parent().get("velocity")
+	if typeof(velocity_value) != TYPE_VECTOR3:
+		return
+
+	var velocity: Vector3 = velocity_value
+	var horizontal_velocity: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+	var horizontal_speed: float = horizontal_velocity.length()
+
+	_idle_time += delta
+	_smoothed_speed = lerpf(_smoothed_speed, horizontal_speed, min(1.0, delta * 10.0))
+
+	var speed_ratio: float = clamp(_smoothed_speed / 6.0, 0.0, 1.0)
+	var move_weight: float = clamp(_smoothed_speed / 3.5, 0.0, 1.0)
+	var idle_weight: float = 1.0 - move_weight
+
+	_walk_time += delta * lerpf(2.0, 10.5, speed_ratio)
+
+	var local_velocity: Vector3 = get_parent().global_transform.basis.inverse() * horizontal_velocity
+	var walk_direction: float = 1.0
+	if local_velocity.z > 0.05:
+		walk_direction = -1.0
+
+	var strafe_amount: float = 0.0
+	if _smoothed_speed > 0.001:
+		strafe_amount = clamp(local_velocity.x / _smoothed_speed, -1.0, 1.0)
+
+	var walk_sin: float = sin(_walk_time)
+	var walk_cos: float = cos(_walk_time)
+	var step_bounce: float = abs(walk_cos)
+
+	var idle_bob: float = sin(_idle_time * 2.0) * 0.02 * idle_weight
+	var idle_breath: float = sin(_idle_time * 1.6) * 0.025 * idle_weight
+	var idle_sway: float = sin(_idle_time * 1.1) * 0.03 * idle_weight
+
+	var body_position := _body_rest_position + Vector3(0.0, idle_bob + step_bounce * 0.025 * move_weight, 0.0)
+	var head_position := _head_rest_position + Vector3(0.0, idle_bob * 1.2 + step_bounce * 0.015 * move_weight, 0.0)
+	var arm_l_position := _arm_l_rest_position + Vector3(0.0, idle_bob * 0.35, 0.0)
+	var arm_r_position := _arm_r_rest_position + Vector3(0.0, idle_bob * 0.35, 0.0)
+	var leg_l_position := _leg_l_rest_position
+	var leg_r_position := _leg_r_rest_position
+
+	var arm_swing: float = walk_sin * 0.95 * move_weight * walk_direction
+	var leg_swing: float = walk_sin * 1.2 * move_weight * walk_direction
+	var body_roll: float = (-strafe_amount * 0.12 * move_weight) + idle_sway * 0.25
+	var head_roll: float = -idle_sway * 0.18
+	var arm_yaw: float = strafe_amount * 0.08 * move_weight
+	var leg_roll: float = strafe_amount * 0.06 * move_weight
+
+	var body_rotation := Vector3(
+		idle_breath + step_bounce * 0.04 * move_weight,
+		0.0,
+		body_roll
+	)
+	var head_rotation := Vector3(
+		idle_breath * 0.8 - step_bounce * 0.02 * move_weight,
+		arm_yaw * 0.8,
+		head_roll
+	)
+	var arm_l_rotation: float = arm_swing
+	var arm_r_rotation: float = -arm_swing
+	var leg_l_rotation: float = -leg_swing
+	var leg_r_rotation: float = leg_swing
+
+	if move_weight < 0.05:
+		arm_l_rotation = 0.0
+		arm_r_rotation = 0.0
+		leg_l_rotation = 0.0
+		leg_r_rotation = 0.0
+		body_rotation = Vector3(idle_breath, 0.0, idle_sway * 0.25)
+		head_rotation = Vector3(idle_breath * 0.8, 0.0, -idle_sway * 0.18)
+
+	var blend: float = min(1.0, delta * lerpf(6.0, 14.0, move_weight))
+
+	_animate_part(body, body_rotation, body_position, blend)
+	_animate_part(head, head_rotation, head_position, blend)
+	_animate_part(arm_l, Vector3(arm_l_rotation, arm_yaw, -0.08 if move_weight >= 0.05 else 0.0), arm_l_position, blend)
+	_animate_part(arm_r, Vector3(arm_r_rotation, arm_yaw, 0.08 if move_weight >= 0.05 else 0.0), arm_r_position, blend)
+	_animate_part(leg_l, Vector3(leg_l_rotation, 0.0, leg_roll), leg_l_position, blend)
+	_animate_part(leg_r, Vector3(leg_r_rotation, 0.0, leg_roll), leg_r_position, blend)
 
 func _head_uv(base_layer: bool) -> Dictionary:
 	var ox := 0 if base_layer else 32
