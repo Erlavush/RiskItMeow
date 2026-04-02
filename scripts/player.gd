@@ -17,8 +17,7 @@ const THIRD_PERSON_OFFSET := Vector2(0.65, 0.18)
 
 const MIN_PITCH: float = -1.55
 const MAX_PITCH: float = 1.55
-const PLATFORM_HALF_SIZE: float = 5.0
-const PLATFORM_MARGIN: float = 0.45
+const ROOM_MARGIN: float = 0.7
 
 const CAMERA_DISTANCE_SMOOTH: float = 10.0
 const CAMERA_OFFSET_SMOOTH: float = 10.0
@@ -48,6 +47,8 @@ var smoothed_camera_distance: float = THIRD_PERSON_DISTANCE
 var smoothed_camera_offset: Vector2 = Vector2.ZERO
 
 var skin_ui: SkinPicker
+var room_bounds_half_extents: Vector2 = Vector2(5.3, 5.3)
+var build_mode_controller: Node
 
 @onready var rig: MinecraftRig = $MinecraftRig
 @onready var camera_pivot: Node3D = $CameraPivot
@@ -88,6 +89,12 @@ func _refresh_camera_ui() -> void:
 		skin_ui.call("_refresh_ui")
 
 func _unhandled_input(event: InputEvent) -> void:
+	if build_mode_controller != null and build_mode_controller.has_method("handle_player_input_event"):
+		var handled: bool = bool(build_mode_controller.call("handle_player_input_event", event))
+		if handled:
+			get_viewport().set_input_as_handled()
+			return
+
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		var motion: InputEventMouseMotion = event as InputEventMouseMotion
 
@@ -145,7 +152,7 @@ func _update_follow_movement(delta: float, input_dir: Vector3, speed: float) -> 
 
 	velocity = move_dir * speed
 	move_and_slide()
-	_clamp_player_to_platform()
+	_clamp_player_to_room_bounds()
 
 	if camera_mode == CameraMode.FIRSTPERSON:
 		rotation.y = lerp_angle(rotation.y, camera_yaw, min(1.0, delta * BODY_TURN_SMOOTH))
@@ -202,14 +209,27 @@ func _get_input_direction() -> Vector3:
 		input_dir.y -= 1.0
 	return input_dir
 
-func _clamp_player_to_platform() -> void:
-	var min_x: float = -PLATFORM_HALF_SIZE + PLATFORM_MARGIN
-	var max_x: float = PLATFORM_HALF_SIZE - PLATFORM_MARGIN
-	var min_z: float = -PLATFORM_HALF_SIZE + PLATFORM_MARGIN
-	var max_z: float = PLATFORM_HALF_SIZE - PLATFORM_MARGIN
+func _clamp_player_to_room_bounds() -> void:
+	var min_x: float = -room_bounds_half_extents.x + ROOM_MARGIN
+	var max_x: float = room_bounds_half_extents.x - ROOM_MARGIN
+	var min_z: float = -room_bounds_half_extents.y + ROOM_MARGIN
+	var max_z: float = room_bounds_half_extents.y - ROOM_MARGIN
 
 	global_position.x = clamp(global_position.x, min_x, max_x)
 	global_position.z = clamp(global_position.z, min_z, max_z)
+
+func set_room_bounds_half_extents(next_bounds: Vector2) -> void:
+	room_bounds_half_extents = Vector2(
+		max(1.0, next_bounds.x),
+		max(1.0, next_bounds.y)
+	)
+	_clamp_player_to_room_bounds()
+
+func set_build_mode_controller(controller: Node) -> void:
+	build_mode_controller = controller
+
+func get_active_camera() -> Camera3D:
+	return camera
 
 func cycle_camera_mode() -> void:
 	var next_mode: int = (camera_mode + 1) % 3
@@ -257,7 +277,7 @@ func set_camera_mode(mode: int) -> void:
 		smoothed_camera_offset = THIRD_PERSON_OFFSET * _get_pitch_squeeze(camera_pitch)
 
 	_sync_follow_camera_rig()
-	_clamp_player_to_platform()
+	_clamp_player_to_room_bounds()
 	_refresh_camera_ui()
 
 func get_camera_mode_name() -> String:
