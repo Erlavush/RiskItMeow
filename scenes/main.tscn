@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/build_toolbar.tscn" id="4_build_toolbar"]
 [ext_resource type="Script" path="res://scripts/build/build_mode_controller.gd" id="5_build_controller"]
 [ext_resource type="Script" path="res://scripts/cats/sample_cat_manager.gd" id="6_cat_manager"]
+[ext_resource type="Script" path="res://scripts/camera/room_view_camera_controller.gd" id="7_room_camera"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
 sky_top_color = Color(0.172549, 0.447059, 0.886275, 1)
@@ -66,8 +67,16 @@ directional_shadow_max_distance = 30.0
 
 [node name="RoomShell" parent="." unique_id=877916492 instance=ExtResource("2_room_shell")]
 
+[node name="RoomViewCameraController" type="Node3D" parent="." unique_id=553861112]
+script = ExtResource("7_room_camera")
+
+[node name="Camera3D" type="Camera3D" parent="RoomViewCameraController" unique_id=116601384]
+fov = 24.0
+current = true
+
 [node name="Player" parent="." unique_id=1826654061 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 0.9893943, 0.14525425, 0, -0.14525425, 0.9893943, 4.733932, 1.3850749, -0.72275114)
+room_camera_controller_path = NodePath("../RoomViewCameraController")
 
 [node name="RoomOcclusionController" type="Node" parent="." unique_id=1653378824]
 script = ExtResource("3_occlusion")
