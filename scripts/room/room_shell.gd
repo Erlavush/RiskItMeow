@@ -3,6 +3,7 @@ class_name RoomShell
 extends Node3D
 
 const RoomConstants := preload("res://scripts/room/room_constants.gd")
+const FloorCheckerShader := preload("res://shaders/floor_checker.gdshader")
 const EDITOR_PREVIEW_FLOOR_LIFT := 0.04
 
 @export var room_half_extents: Vector2 = RoomConstants.DEFAULT_ROOM_HALF_EXTENTS
@@ -48,7 +49,6 @@ func get_ceiling_y() -> float:
 
 func get_inner_half_extents() -> Vector2:
 	return room_half_extents
-
 func get_walkable_half_extents(margin: float = RoomConstants.DEFAULT_PLAYER_MARGIN) -> Vector2:
 	return Vector2(
 		max(0.5, room_half_extents.x - margin),
@@ -92,15 +92,16 @@ func is_surface_visible(surface_name: String) -> bool:
 
 func _configure_floor() -> void:
 	var floor_size := Vector3(
-		room_half_extents.x * 2.0 + wall_thickness * 2.0,
+		room_half_extents.x * 2.0,
 		floor_thickness,
-		room_half_extents.y * 2.0 + wall_thickness * 2.0
+		room_half_extents.y * 2.0
 	)
 	var floor_center := Vector3(0.0, -floor_thickness * 0.5, 0.0)
 	if Engine.is_editor_hint():
 		# Lift the preview slightly above the editor grid so the floor is visible without running the scene.
 		floor_center.y += EDITOR_PREVIEW_FLOOR_LIFT
 	_configure_surface(floor, floor_center, floor_size, floor_color)
+	_apply_floor_checker_material()
 
 func _configure_walls() -> void:
 	var span_x := room_half_extents.x * 2.0
@@ -215,3 +216,18 @@ func _is_surface_enabled(surface_name: String) -> bool:
 	if surface_name == RoomConstants.CEILING_SURFACE:
 		return show_ceiling
 	return true
+
+func _apply_floor_checker_material() -> void:
+	var visual := floor.get_node_or_null("Visual") as MeshInstance3D
+	if visual == null:
+		return
+
+	var shader_material := visual.material_override as ShaderMaterial
+	if shader_material == null or shader_material.shader != FloorCheckerShader:
+		shader_material = ShaderMaterial.new()
+		shader_material.shader = FloorCheckerShader
+		visual.material_override = shader_material
+
+	shader_material.set_shader_parameter("checker_size", RoomConstants.DEFAULT_GRID_SIZE)
+	shader_material.set_shader_parameter("light_color", Color(0.67, 0.67, 0.67, 1.0))
+	shader_material.set_shader_parameter("dark_color", Color(0.12, 0.12, 0.12, 1.0))

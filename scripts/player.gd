@@ -1,14 +1,15 @@
 extends CharacterBody3D
 
+const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const SPEED: float = 5.0
 const FAST_SPEED: float = 15.0
-const ROOM_MARGIN: float = 0.7
+const ROOM_MARGIN: float = RoomConstants.DEFAULT_PLAYER_MARGIN
 const BODY_TURN_SMOOTH: float = 10.0
 
 @export var room_camera_controller_path: NodePath
 
 var skin_ui: SkinPicker
-var room_bounds_half_extents: Vector2 = Vector2(5.3, 5.3)
+var room_bounds_half_extents: Vector2 = RoomConstants.DEFAULT_ROOM_HALF_EXTENTS - Vector2.ONE * ROOM_MARGIN
 var room_floor_y: float = 0.0
 
 @onready var rig: MinecraftRig = $MinecraftRig
@@ -88,10 +89,10 @@ func _get_move_direction(input_vector: Vector2) -> Vector3:
 	return right * input_vector.x + forward * input_vector.y
 
 func _clamp_player_to_room_bounds() -> void:
-	var min_x: float = -room_bounds_half_extents.x + ROOM_MARGIN
-	var max_x: float = room_bounds_half_extents.x - ROOM_MARGIN
-	var min_z: float = -room_bounds_half_extents.y + ROOM_MARGIN
-	var max_z: float = room_bounds_half_extents.y - ROOM_MARGIN
+	var min_x: float = -room_bounds_half_extents.x
+	var max_x: float = room_bounds_half_extents.x
+	var min_z: float = -room_bounds_half_extents.y
+	var max_z: float = room_bounds_half_extents.y
 
 	global_position.x = clamp(global_position.x, min_x, max_x)
 	global_position.z = clamp(global_position.z, min_z, max_z)

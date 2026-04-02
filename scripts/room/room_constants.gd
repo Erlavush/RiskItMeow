@@ -17,13 +17,13 @@ const WALL_SURFACES := [
 	WALL_RIGHT,
 ]
 
-const DEFAULT_ROOM_HALF_EXTENTS := Vector2(6.0, 6.0)
+const DEFAULT_ROOM_HALF_EXTENTS := Vector2(5.0, 5.0)
 const DEFAULT_WALL_HEIGHT := 3.4
 const DEFAULT_FLOOR_THICKNESS := 0.45
 const DEFAULT_WALL_THICKNESS := 0.24
 const DEFAULT_CEILING_THICKNESS := 0.24
-const DEFAULT_PLAYER_MARGIN := 0.7
-const DEFAULT_GRID_SIZE := 0.5
+const DEFAULT_PLAYER_MARGIN := 0.4
+const DEFAULT_GRID_SIZE := 1.0
 
 static func is_wall_surface(surface: String) -> bool:
 	return WALL_SURFACES.has(surface)

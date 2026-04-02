@@ -51,7 +51,7 @@ func _setup_ui() -> void:
 	toolbar.add_child(view_button)
 
 	status_label = Label.new()
-	status_label.text = "Drag to orbit, wheel to zoom, B toggles build mode."
+	status_label.text = "Right-drag or middle-drag to orbit, wheel to zoom, Home resets the room camera."
 	vbox.add_child(status_label)
 
 	file_dialog = FileDialog.new()

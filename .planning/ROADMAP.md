@@ -6,7 +6,7 @@
 
 ## Overview
 
-This repo no longer follows a source-porting roadmap. The project baseline is now a player, a floor platform, and a single orbit camera. Future work is manual, narrow, and added only when the user explicitly asks for it.
+This repo no longer follows a source-porting roadmap. The current prototype baseline now includes a player, a 10x10 build floor, a single orbit camera, and a runtime placement prototype. Future work is manual, narrow, and added only when the user explicitly asks for it.
 
 **Execution guardrails:**
 - Do not assume source-project parity work.
@@ -15,9 +15,9 @@ This repo no longer follows a source-porting roadmap. The project baseline is no
 
 ## Current Baseline
 
-- Active scene: player + floor + one orbit camera
+- Active scene: player + 10x10 floor + one orbit camera + chair placement prototype
 - Walls and ceiling are hidden
-- Cats and build/placement systems are removed from the live scene
+- Placement currently supports a `Simple Wood Chair`, stock UI, dotted grid overlay, preview validation, and runtime gizmo movement
 
 ## Phases
 
@@ -30,4 +30,4 @@ If the user wants structured planning again later, create a new phase from the c
 Ask for the next feature directly.
 
 ---
-*Last updated: 2026-04-02 after resetting the project to manual feature work*
+*Last updated: 2026-04-02 after adding the runtime placement prototype and polish pass*

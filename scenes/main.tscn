@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://wvmdc0hnjr3m" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/room/room_shell.tscn" id="2_room_shell"]
+[ext_resource type="Script" path="res://scripts/placement/placement_manager.gd" id="3_placement_manager"]
 [ext_resource type="Script" uid="uid://by86v04yuhj3s" path="res://scripts/camera/room_view_camera_controller.gd" id="7_room_camera"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
@@ -62,6 +63,7 @@ directional_shadow_fade_start = 1.0
 directional_shadow_max_distance = 30.0
 
 [node name="RoomShell" parent="." unique_id=877916492 instance=ExtResource("2_room_shell")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.018832207, 2.3841858e-07, -0.015720844)
 show_walls = false
 show_ceiling = false
 
@@ -71,6 +73,12 @@ script = ExtResource("7_room_camera")
 [node name="Camera3D" type="Camera3D" parent="RoomViewCameraController" unique_id=116601384]
 current = true
 fov = 24.0
+
+[node name="PlacementManager" type="Node3D" parent="." unique_id=180246391]
+script = ExtResource("3_placement_manager")
+room_shell_path = NodePath("../RoomShell")
+room_camera_controller_path = NodePath("../RoomViewCameraController")
+player_path = NodePath("../Player")
 
 [node name="Player" parent="." unique_id=1826654061 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.85)
