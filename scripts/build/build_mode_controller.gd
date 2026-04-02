@@ -87,10 +87,13 @@ func get_placed_items() -> Array[Dictionary]:
 func get_floor_obstacles() -> Array[Dictionary]:
 	return _resolver.get_floor_obstacles(placed_items)
 
+func is_build_mode_active() -> bool:
+	return build_mode_enabled
+
 func _set_build_mode_enabled(enabled: bool) -> void:
 	build_mode_enabled = enabled
 	if build_mode_enabled:
-		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 		_rebuild_preview_node()
 		_update_preview()
 	else:
@@ -119,10 +122,8 @@ func _ensure_world_nodes() -> void:
 func _update_preview() -> void:
 	if player == null or room_shell == null or _preview_root == null:
 		return
-	if not player.has_method("get_active_camera"):
-		return
 
-	var camera: Camera3D = player.call("get_active_camera") as Camera3D
+	var camera := _get_active_camera()
 	if camera == null:
 		return
 
@@ -212,3 +213,8 @@ func _refresh_toolbar() -> void:
 	if build_mode_enabled and str(definition.get("family", "")) == PlacementTypes.FAMILY_SURFACE and not _placement_valid:
 		helper_text = "Place or aim at a coffee table before placing the flower vase."
 	toolbar.call("set_state", build_mode_enabled, selected_text, status_text, helper_text)
+
+func _get_active_camera() -> Camera3D:
+	if player == null or not player.has_method("get_active_camera"):
+		return null
+	return player.call("get_active_camera") as Camera3D

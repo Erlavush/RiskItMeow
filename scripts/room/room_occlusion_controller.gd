@@ -21,10 +21,7 @@ func _process(_delta: float) -> void:
 	if player == null or room_shell == null:
 		return
 
-	if not player.has_method("get_active_camera"):
-		return
-
-	var active_camera: Camera3D = player.call("get_active_camera") as Camera3D
+	var active_camera := _get_active_camera()
 	if active_camera == null:
 		return
 
@@ -59,3 +56,8 @@ func _process(_delta: float) -> void:
 	_last_visibility_key = visibility_key
 	for surface_name in visibility.keys():
 		room_shell.set_surface_visible(surface_name, visibility[surface_name])
+
+func _get_active_camera() -> Camera3D:
+	if player == null or not player.has_method("get_active_camera"):
+		return null
+	return player.call("get_active_camera") as Camera3D
