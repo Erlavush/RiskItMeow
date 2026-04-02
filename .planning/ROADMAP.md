@@ -53,4 +53,4 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Local Room Shell, Placement, and Sample Cats | v1.0 | 3/3 | Complete   | 2026-04-02 |
-| 2. Room-View Camera and Visual Fidelity | v1.0 | 0/3 | Pending    |  |
+| 2. Room-View Camera and Visual Fidelity | v1.0 | 1/3 | In Progress |  |

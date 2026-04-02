@@ -55,7 +55,7 @@ Last activity: 2026-04-02
 
 ### Blockers/Concerns
 
-- The current Godot camera shakes and still uses a prototype multi-mode stack that Phase 2 is specifically meant to replace.
+- The room camera baseline is now stable, but the room shell still reads as a plain white box until 02-02 lands.
 - Interactive runtime smoke checks in the Godot editor still need a human pass for camera peel feel, placement feel, and cat pacing.
 - Browser export viability is still inferred from headless Godot load checks because no export presets exist yet.
 - Cat visual overhaul is deferred until after the camera and room shell are in better shape.
