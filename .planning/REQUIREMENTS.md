@@ -16,11 +16,11 @@
 
 ### Placement
 
-- [ ] **PLAC-01**: Player can place floor furniture on a grid inside valid room bounds.
-- [ ] **PLAC-02**: Player can place wall furniture on all four walls with consistent wall targeting.
-- [ ] **PLAC-03**: Player can place ceiling or roof furniture on valid overhead surfaces.
-- [ ] **PLAC-04**: Player can place surface decor on valid support hosts using anchored local offsets.
-- [ ] **PLAC-05**: Placement logic distinguishes floor, wall, ceiling/roof, and surface-decor families instead of treating all items the same.
+- [x] **PLAC-01**: Player can place floor furniture on a grid inside valid room bounds.
+- [x] **PLAC-02**: Player can place wall furniture on all four walls with consistent wall targeting.
+- [x] **PLAC-03**: Player can place ceiling or roof furniture on valid overhead surfaces.
+- [x] **PLAC-04**: Player can place surface decor on valid support hosts using anchored local offsets.
+- [x] **PLAC-05**: Placement logic distinguishes floor, wall, ceiling/roof, and surface-decor families instead of treating all items the same.
 
 ### Cats
 
@@ -55,11 +55,11 @@
 | CTRL-01 | Phase 1 | Complete |
 | SHELL-01 | Phase 1 | Complete |
 | SHELL-02 | Phase 1 | Complete |
-| PLAC-01 | Phase 1 | Pending |
-| PLAC-02 | Phase 1 | Pending |
-| PLAC-03 | Phase 1 | Pending |
-| PLAC-04 | Phase 1 | Pending |
-| PLAC-05 | Phase 1 | Pending |
+| PLAC-01 | Phase 1 | Complete |
+| PLAC-02 | Phase 1 | Complete |
+| PLAC-03 | Phase 1 | Complete |
+| PLAC-04 | Phase 1 | Complete |
+| PLAC-05 | Phase 1 | Complete |
 | CATS-01 | Phase 1 | Pending |
 | CATS-02 | Phase 1 | Pending |
 | PERF-01 | Phase 1 | Complete |

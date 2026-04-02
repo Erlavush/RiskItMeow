@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: local-room-builder-foundation
 status: in_progress
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-04-02T18:10:48+08:00"
-last_activity: 2026-04-02 -- Completed Plan 01 for room shell, occlusion, and room-aware player bounds.
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-04-02T18:28:56+08:00"
+last_activity: 2026-04-02 -- Completed Plan 02 for local build catalog, placement families, and runtime build mode.
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 1 (In progress)
-Plan: 2 of 3
-Status: Plan 01 completed. The room shell, occlusion controller, and room-aware player bounds are in place; placement systems are next.
-Last activity: 2026-04-02 -- Completed Plan 01 and advanced to placement work.
+Plan: 3 of 3
+Status: Plans 01 and 02 completed. The room shell, occlusion, placement resolver, and build mode are in place; sample cats and integrated verification are next.
+Last activity: 2026-04-02 -- Completed Plan 02 and advanced to sample-cat integration.
 
 ## Milestone Scope
 
@@ -53,12 +53,12 @@ Last activity: 2026-04-02 -- Completed Plan 01 and advanced to placement work.
 
 ### Blockers/Concerns
 
-- Placement and sample-cat systems still need to be implemented on top of the new room shell foundation.
+- Sample-cat systems and integrated manual verification still need to be completed on top of the room shell and placement foundation.
 - The source repo's room-builder logic is spread across multiple React Three Fiber components and utilities, so parity still requires careful local-system extraction.
 - Browser export viability is still inferred from headless Godot load checks because no export presets exist yet.
 
 ## Session Continuity
 
 Last session: 2026-04-02T10:11:54.310Z
-Stopped at: Completed 01-01-PLAN.md
+Stopped at: Completed 01-02-PLAN.md
 Resume command: `$gsd-execute-phase 1`
