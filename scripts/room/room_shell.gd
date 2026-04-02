@@ -1,13 +1,17 @@
+@tool
 class_name RoomShell
 extends Node3D
 
 const RoomConstants := preload("res://scripts/room/room_constants.gd")
+const EDITOR_PREVIEW_FLOOR_LIFT := 0.04
 
 @export var room_half_extents: Vector2 = RoomConstants.DEFAULT_ROOM_HALF_EXTENTS
 @export var wall_height: float = RoomConstants.DEFAULT_WALL_HEIGHT
 @export var floor_thickness: float = RoomConstants.DEFAULT_FLOOR_THICKNESS
 @export var wall_thickness: float = RoomConstants.DEFAULT_WALL_THICKNESS
 @export var ceiling_thickness: float = RoomConstants.DEFAULT_CEILING_THICKNESS
+@export var show_walls: bool = true
+@export var show_ceiling: bool = true
 
 @export var floor_color: Color = Color(0.843, 0.745, 0.612, 1.0)
 @export var wall_color: Color = Color(0.956, 0.929, 0.882, 1.0)
@@ -20,6 +24,10 @@ const RoomConstants := preload("res://scripts/room/room_constants.gd")
 @onready var wall_front: Node3D = $wall_front
 @onready var wall_right: Node3D = $wall_right
 @onready var ceiling: Node3D = $ceiling
+
+func _enter_tree() -> void:
+	if Engine.is_editor_hint():
+		call_deferred("_rebuild")
 
 func _ready() -> void:
 	_rebuild()
@@ -67,7 +75,12 @@ func set_surface_visible(surface_name: String, is_visible: bool) -> void:
 
 	var visual: VisualInstance3D = surface.get_node_or_null("Visual") as VisualInstance3D
 	if visual != null:
-		visual.visible = is_visible
+		visual.visible = is_visible and _is_surface_enabled(surface_name)
+
+	var collider_body := surface.get_node_or_null("Collider") as CollisionObject3D
+	if collider_body != null:
+		collider_body.disable_mode = CollisionObject3D.DISABLE_MODE_REMOVE
+		collider_body.process_mode = Node.PROCESS_MODE_INHERIT if _is_surface_enabled(surface_name) else Node.PROCESS_MODE_DISABLED
 
 func is_surface_visible(surface_name: String) -> bool:
 	var surface: Node3D = _get_surface_node(surface_name)
@@ -75,7 +88,7 @@ func is_surface_visible(surface_name: String) -> bool:
 		return false
 
 	var visual: VisualInstance3D = surface.get_node_or_null("Visual") as VisualInstance3D
-	return visual == null or visual.visible
+	return (visual == null or visual.visible) and _is_surface_enabled(surface_name)
 
 func _configure_floor() -> void:
 	var floor_size := Vector3(
@@ -84,6 +97,9 @@ func _configure_floor() -> void:
 		room_half_extents.y * 2.0 + wall_thickness * 2.0
 	)
 	var floor_center := Vector3(0.0, -floor_thickness * 0.5, 0.0)
+	if Engine.is_editor_hint():
+		# Lift the preview slightly above the editor grid so the floor is visible without running the scene.
+		floor_center.y += EDITOR_PREVIEW_FLOOR_LIFT
 	_configure_surface(floor, floor_center, floor_size, floor_color)
 
 func _configure_walls() -> void:
@@ -159,6 +175,8 @@ func _configure_surface(surface: Node3D, center: Vector3, size: Vector3, color: 
 	if override != null:
 		override.albedo_color = color
 
+	set_surface_visible(_get_surface_name(surface), true)
+
 func _get_surface_node(surface_name: String) -> Node3D:
 	match surface_name:
 		RoomConstants.FLOOR_SURFACE:
@@ -175,3 +193,25 @@ func _get_surface_node(surface_name: String) -> Node3D:
 			return ceiling
 		_:
 			return null
+
+func _get_surface_name(surface: Node3D) -> String:
+	if surface == floor:
+		return RoomConstants.FLOOR_SURFACE
+	if surface == wall_back:
+		return RoomConstants.WALL_BACK
+	if surface == wall_left:
+		return RoomConstants.WALL_LEFT
+	if surface == wall_front:
+		return RoomConstants.WALL_FRONT
+	if surface == wall_right:
+		return RoomConstants.WALL_RIGHT
+	if surface == ceiling:
+		return RoomConstants.CEILING_SURFACE
+	return ""
+
+func _is_surface_enabled(surface_name: String) -> bool:
+	if RoomConstants.is_wall_surface(surface_name):
+		return show_walls
+	if surface_name == RoomConstants.CEILING_SURFACE:
+		return show_ceiling
+	return true

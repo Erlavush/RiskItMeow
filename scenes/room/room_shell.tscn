@@ -2,16 +2,31 @@
 
 [ext_resource type="Script" path="res://scripts/room/room_shell.gd" id="1_room_shell"]
 
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+size = Vector3(12.48, 0.45, 12.48)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.843, 0.745, 0.612, 1)
+roughness = 0.92
+metallic_specular = 0.0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(12.48, 0.45, 12.48)
+
 [node name="RoomShell" type="Node3D"]
 script = ExtResource("1_room_shell")
 
 [node name="floor" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.185, 0)
 
 [node name="Visual" type="MeshInstance3D" parent="floor"]
+material_override = SubResource("StandardMaterial3D_floor")
+mesh = SubResource("BoxMesh_floor")
 
 [node name="Collider" type="StaticBody3D" parent="floor"]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="floor/Collider"]
+shape = SubResource("BoxShape3D_floor")
 
 [node name="wall_back" type="Node3D" parent="."]
 

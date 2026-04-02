@@ -9,13 +9,14 @@ const BODY_TURN_SMOOTH: float = 10.0
 
 var skin_ui: SkinPicker
 var room_bounds_half_extents: Vector2 = Vector2(5.3, 5.3)
-var build_mode_controller: Node
+var room_floor_y: float = 0.0
 
 @onready var rig: MinecraftRig = $MinecraftRig
 @onready var legacy_camera: Camera3D = $CameraPivot/SpringArm3D/Camera3D
 @onready var room_camera_controller: Node = get_node_or_null(room_camera_controller_path)
 
 func _ready() -> void:
+	_normalize_player_pose()
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_spawn_ui()
 	if legacy_camera != null:
@@ -28,12 +29,6 @@ func _spawn_ui() -> void:
 	add_child(skin_ui)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if build_mode_controller != null and build_mode_controller.has_method("handle_player_input_event"):
-		var handled: bool = bool(build_mode_controller.call("handle_player_input_event", event))
-		if handled:
-			get_viewport().set_input_as_handled()
-			return
-
 	if room_camera_controller != null:
 		var camera_handled: bool = room_camera_controller.handle_input_event(event)
 		if camera_handled:
@@ -49,6 +44,7 @@ func _physics_process(delta: float) -> void:
 
 	velocity = move_dir * speed
 	move_and_slide()
+	_snap_to_floor()
 	_clamp_player_to_room_bounds()
 
 	if Vector2(velocity.x, velocity.z).length() > 0.05:
@@ -107,8 +103,9 @@ func set_room_bounds_half_extents(next_bounds: Vector2) -> void:
 	)
 	_clamp_player_to_room_bounds()
 
-func set_build_mode_controller(controller: Node) -> void:
-	build_mode_controller = controller
+func set_floor_y(next_floor_y: float) -> void:
+	room_floor_y = next_floor_y
+	_snap_to_floor()
 
 func get_active_camera() -> Camera3D:
 	if room_camera_controller != null and room_camera_controller.has_method("get_camera"):
@@ -118,3 +115,10 @@ func get_active_camera() -> Camera3D:
 func reset_room_camera() -> void:
 	if room_camera_controller != null and room_camera_controller.has_method("reset_camera"):
 		room_camera_controller.reset_camera()
+
+func _normalize_player_pose() -> void:
+	rotation = Vector3(0.0, rotation.y, 0.0)
+	_snap_to_floor()
+
+func _snap_to_floor() -> void:
+	global_position.y = room_floor_y

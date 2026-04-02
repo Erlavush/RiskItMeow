@@ -6,7 +6,7 @@ const DEFAULT_CAMERA_POSITION := Vector3(11.8, 9.6, 11.2)
 
 @export var target_position: Vector3 = DEFAULT_TARGET_POSITION
 @export_range(0.001, 0.03, 0.001) var orbit_sensitivity: float = 0.01
-@export_range(0.18, 1.4, 0.01) var min_pitch: float = 0.18
+@export_range(-1.2, 1.4, 0.01) var min_pitch: float = -0.75
 @export_range(0.2, 1.5, 0.01) var max_pitch: float = 1.5
 @export_range(2.0, 48.0, 0.1) var min_distance: float = 5.0
 @export_range(2.0, 48.0, 0.1) var max_distance: float = 48.0
@@ -44,11 +44,11 @@ func handle_input_event(event: InputEvent) -> bool:
 		match mouse_button.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				if mouse_button.pressed:
-					_apply_zoom_delta(mouse_button.factor if mouse_button.factor != 0.0 else -1.0)
+					_apply_zoom_delta(-1.0, absf(mouse_button.factor))
 					return true
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if mouse_button.pressed:
-					_apply_zoom_delta(mouse_button.factor if mouse_button.factor != 0.0 else 1.0)
+					_apply_zoom_delta(1.0, absf(mouse_button.factor))
 					return true
 			MOUSE_BUTTON_LEFT, MOUSE_BUTTON_MIDDLE:
 				if mouse_button.pressed:
@@ -62,7 +62,7 @@ func handle_input_event(event: InputEvent) -> bool:
 	if event is InputEventMouseMotion and _drag_button != MOUSE_BUTTON_NONE:
 		var motion := event as InputEventMouseMotion
 		_yaw = wrapf(_yaw - motion.relative.x * orbit_sensitivity, -PI, PI)
-		_pitch = clamp(_pitch - motion.relative.y * orbit_sensitivity, min_pitch, max_pitch)
+		_pitch = clamp(_pitch + motion.relative.y * orbit_sensitivity, min_pitch, max_pitch)
 		_sync_camera_transform()
 		return true
 
@@ -106,8 +106,9 @@ func reset_camera() -> void:
 	_drag_button = MOUSE_BUTTON_NONE
 	_sync_camera_transform()
 
-func _apply_zoom_delta(delta_value: float) -> void:
-	var zoom_scale: float = exp(delta_value * wheel_sensitivity * 100.0)
+func _apply_zoom_delta(direction: float, magnitude: float = 0.0) -> void:
+	var zoom_amount: float = maxf(magnitude, 1.0)
+	var zoom_scale: float = exp(direction * zoom_amount * wheel_sensitivity * 100.0)
 	_target_distance = clamp(_target_distance * zoom_scale, min_distance, max_distance)
 
 func _sync_camera_transform() -> void:

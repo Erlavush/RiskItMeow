@@ -2,52 +2,32 @@
 
 ## Milestones
 
-- [ ] **v1.0 Local Room Builder Foundation** - Phases `1` and `2` establish the local room sandbox and stabilize the room-view camera baseline.
+- [ ] **v1.0 Manual Feature Buildout** - Continue from the minimal Godot baseline through direct feature requests.
 
 ## Overview
 
-Milestone v1.0 is intentionally narrow. It does not include Firebase, shared-room sync, partner presence, couple joining, or click-to-move controls. The milestone now targets two local-only slices: Phase 1 delivered the first room-builder foundation, and Phase 2 stops at the stable `FAHHHH`-style room-view camera baseline. Future feature work will be requested manually instead of auto-continuing the removed 02-02 / 02-03 plan bundle.
+This repo no longer follows a source-porting roadmap. The project baseline is now a player, a floor platform, and a single orbit camera. Future work is manual, narrow, and added only when the user explicitly asks for it.
 
-**Execution guardrail:** Any implementation that drifts into backend, multiplayer, or couple systems is out of scope for this milestone.
+**Execution guardrails:**
+- Do not assume source-project parity work.
+- Do not add backend, multiplayer, shared-room, or couple systems.
+- Do not continue old bundled phase plans unless the user explicitly asks to start structured planning again.
+
+## Current Baseline
+
+- Active scene: player + floor + one orbit camera
+- Walls and ceiling are hidden
+- Cats and build/placement systems are removed from the live scene
 
 ## Phases
 
-### Phase 1: Local Room Shell, Placement, and Sample Cats
-**Goal**: Build the first usable local room-builder slice in Godot with shell geometry, occlusion, grid placement, anchored surface decor, and sample cats while preserving the current direct player controls.
-**Depends on**: Existing Godot prototype
-**Requirements**: [CTRL-01, SHELL-01, SHELL-02, PLAC-01, PLAC-02, PLAC-03, PLAC-04, PLAC-05, CATS-01, CATS-02, PERF-01, SCOPE-01]
-**UI hint**: yes
-**Success Criteria**:
-  1. The main Godot scene contains a usable room shell with floor, four walls, and roof/ceiling geometry.
-  2. Camera-driven occlusion can hide or peel the necessary walls/roof to keep the room interior visible.
-  3. Grid-based build placement works for floor, wall, ceiling/roof, and anchored surface decor items.
-  4. Sample cats are visible in the room and behave in a readable local-only way.
-  5. Player control remains based on the existing direct movement/camera system and no click-to-move flow is introduced.
-**Plans**: 3 plans
+There are currently no active planned phases.
 
-Plans:
-- [x] 01-01: Build the enclosed room shell and camera occlusion foundation
-- [x] 01-02: Build the grid placement and anchored decor systems
-- [x] 01-03: Add sample cats and integrate the local room-builder slice
+If the user wants structured planning again later, create a new phase from the current baseline instead of reviving the removed porting plans.
 
-### Phase 2: Room-View Camera and Visual Fidelity
-**Goal**: Replace the current shaky multi-camera prototype with the single room-view orbit camera from `FAHHHH` while preserving local-only scope and direct movement. Broader room-presentation follow-up work is intentionally deferred until it is requested manually.
-**Depends on**: Phase 1
-**Requirements**: [CTRL-01, CAM-01, CAM-02, PERF-01, SCOPE-01]
-**UI hint**: yes
-**Success Criteria**:
-  1. The runtime uses one stable room-centered orbit camera instead of freecam / third-person / first-person switching.
-  2. Build mode, occlusion, and player control remain usable with the new camera baseline and no click-to-move is introduced.
-  3. The project remains local-only and does not drift into backend, multiplayer, or couple systems.
-  4. Any room-presentation or cat follow-up work is explicitly deferred until it is requested manually.
-**Plans**: 1 plan
+## Next Step
 
-Plans:
-- [x] 02-01: Replace the current camera stack with a stable room-view orbit camera
+Ask for the next feature directly.
 
-## Progress
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. Local Room Shell, Placement, and Sample Cats | v1.0 | 3/3 | Complete   | 2026-04-02 |
-| 2. Room-View Camera and Visual Fidelity | v1.0 | 1/1 | Complete   | 2026-04-02 |
+---
+*Last updated: 2026-04-02 after resetting the project to manual feature work*

@@ -1,20 +1,16 @@
 # Agent Guide
 
-Use `CLAUDE.md` as the generated project guidance source for this repo.
+Use `CLAUDE.md` as the project guidance source for this repo.
 
-## GSD Workflow
+## Current Direction
 
-- Start substantial work through a GSD workflow so `.planning/` artifacts stay in sync.
-- Use `$gsd-quick` for small targeted changes.
-- Use `$gsd-debug` for investigations and bug fixing.
-- Use `$gsd-execute-phase <n>` for planned phase execution.
+- Risk It Meow is now a fresh manual-feature Godot project, not a source-porting project.
+- The active baseline is intentionally small: player, floor, and one room-view orbit camera.
+- Future work is requested and implemented one feature at a time.
 
-## Project Focus
+## Guardrails
 
-- This repo currently targets a local-only Godot room-builder slice.
-- Do not add Firebase, shared-room sync, partner presence, couple joins, or other backend-dependent systems unless the user explicitly restores that scope.
-- Do not reintroduce click-to-move; preserve direct keyboard/mouse movement.
-- Phase 2 replaces the current freecam / first-person / third-person stack with a single room-view orbit camera centered on the room.
-- Phase 2 also upgrades the room shell from a plain white prototype to a themed starter room with better floor, wall, ceiling, trim, and lighting presentation.
-- Cat art or behavior overhauls are deferred until after the camera and room shell are in better shape.
-- Use `Z:\FAHHHH` only as a reference for the local room-view systems that matter to the active roadmap, especially orbit camera behavior, room shell presentation, occlusion, placement, lighting, and deferred sample-cat follow-up work.
+- Do not assume source-project parity or inspect external source repos unless the user explicitly asks for them again.
+- Do not add Firebase, backend sync, shared-room, partner, couple, or multiplayer systems unless the user explicitly restores that scope.
+- Do not reintroduce click-to-move unless the user explicitly asks for it.
+- Treat cats, build mode, placement systems, walls, and roof as removed from the active baseline until requested again.
