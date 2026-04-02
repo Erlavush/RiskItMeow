@@ -116,10 +116,10 @@ func _update_idle(delta: float) -> void:
 	idle_finished.emit(self)
 
 func _update_wander(delta: float) -> void:
-	var current_position := get_floor_position()
-	var to_target := _target_position - current_position
+	var current_position: Vector3 = get_floor_position()
+	var to_target: Vector3 = _target_position - current_position
 	to_target.y = 0.0
-	var distance := to_target.length()
+	var distance: float = to_target.length()
 	if distance <= arrival_distance:
 		global_position = _clamp_to_room(_target_position)
 		_align_to_floor()
@@ -130,30 +130,30 @@ func _update_wander(delta: float) -> void:
 			wander_finished.emit(self)
 		return
 
-	var direction := to_target / max(distance, 0.0001)
-	var step := min(distance, move_speed * delta)
+	var direction: Vector3 = to_target / maxf(distance, 0.0001)
+	var step: float = minf(distance, move_speed * delta)
 	global_position += direction * step
 	global_position = _clamp_to_room(global_position)
 	_align_to_floor()
 	_current_speed = step / max(delta, 0.0001)
 
-	var target_yaw := atan2(-direction.x, -direction.z)
+	var target_yaw: float = atan2(-direction.x, -direction.z)
 	rotation.y = lerp_angle(rotation.y, target_yaw, min(1.0, delta * turn_speed))
 
 func _update_animation(delta: float) -> void:
-	var gait_amount := clampf(_current_speed / max(move_speed, 0.01), 0.0, 1.2)
-	var gait_speed := lerpf(2.6, 11.0, gait_amount)
+	var gait_amount: float = clampf(_current_speed / maxf(move_speed, 0.01), 0.0, 1.2)
+	var gait_speed: float = lerpf(2.6, 11.0, gait_amount)
 	_gait_phase += delta * gait_speed
 
-	var idle_sway := sin(_gait_phase * 0.8) * 0.01
-	var body_bob := sin(_gait_phase * 2.0) * 0.026 * gait_amount + idle_sway
+	var idle_sway: float = sin(_gait_phase * 0.8) * 0.01
+	var body_bob: float = sin(_gait_phase * 2.0) * 0.026 * gait_amount + idle_sway
 	visual_root.position = Vector3(0.0, body_bob, 0.0)
 
 	head_pivot.rotation.x = sin(_gait_phase * 1.1 + 0.4) * 0.06 + gait_amount * 0.04
 	tail_pivot.rotation = Vector3(0.65, 0.0, 0.3 + sin(_gait_phase * 2.5 + 0.8) * (0.12 + gait_amount * 0.08))
 
-	var front_step := max(0.0, sin(_gait_phase * 2.0)) * 0.05 * gait_amount
-	var back_step := max(0.0, sin(_gait_phase * 2.0 + PI)) * 0.05 * gait_amount
+	var front_step: float = maxf(0.0, sin(_gait_phase * 2.0)) * 0.05 * gait_amount
+	var back_step: float = maxf(0.0, sin(_gait_phase * 2.0 + PI)) * 0.05 * gait_amount
 	paw_front_left.position = FRONT_LEFT_PAW + Vector3(0.0, front_step, 0.0)
 	paw_back_right.position = BACK_RIGHT_PAW + Vector3(0.0, front_step, 0.0)
 	paw_front_right.position = FRONT_RIGHT_PAW + Vector3(0.0, back_step, 0.0)
@@ -192,14 +192,14 @@ func _configure_visuals() -> void:
 	_configure_box(paw_back_right, PAW_SIZE, BACK_RIGHT_PAW, accent_color)
 
 func _configure_box(mesh_instance: MeshInstance3D, size: Vector3, center: Vector3, color: Color) -> void:
-	var mesh := BoxMesh.new()
+	var mesh: BoxMesh = BoxMesh.new()
 	mesh.size = size
 	mesh_instance.mesh = mesh
 	mesh_instance.position = center
 	mesh_instance.material_override = _make_material(color)
 
 func _configure_sphere(mesh_instance: MeshInstance3D, radius: float, center: Vector3, color: Color) -> void:
-	var mesh := SphereMesh.new()
+	var mesh: SphereMesh = SphereMesh.new()
 	mesh.radius = radius
 	mesh.height = radius * 2.0
 	mesh_instance.mesh = mesh
@@ -207,7 +207,7 @@ func _configure_sphere(mesh_instance: MeshInstance3D, radius: float, center: Vec
 	mesh_instance.material_override = _make_material(color)
 
 func _make_material(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
+	var material: StandardMaterial3D = StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = 0.95
 	material.metallic_specular = 0.0

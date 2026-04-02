@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://l5jnl6wv2j56" path="res://scripts/room/room_occlusion_controller.gd" id="3_occlusion"]
 [ext_resource type="PackedScene" path="res://scenes/ui/build_toolbar.tscn" id="4_build_toolbar"]
 [ext_resource type="Script" path="res://scripts/build/build_mode_controller.gd" id="5_build_controller"]
+[ext_resource type="Script" path="res://scripts/cats/sample_cat_manager.gd" id="6_cat_manager"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
 sky_top_color = Color(0.172549, 0.447059, 0.886275, 1)
@@ -84,3 +85,12 @@ toolbar_path = NodePath("../BuildToolbar")
 [node name="PlacedItems" type="Node3D" parent="."]
 
 [node name="PlacementPreview" type="Node3D" parent="."]
+
+[node name="Cats" type="Node3D" parent="."]
+
+[node name="SampleCatManager" type="Node" parent="."]
+script = ExtResource("6_cat_manager")
+player_path = NodePath("../Player")
+room_shell_path = NodePath("../RoomShell")
+build_mode_controller_path = NodePath("../BuildModeController")
+cats_root_path = NodePath("../Cats")
