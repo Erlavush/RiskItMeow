@@ -51,7 +51,7 @@ func _setup_ui() -> void:
 	toolbar.add_child(view_button)
 
 	status_label = Label.new()
-	status_label.text = "ESC toggles mouse"
+	status_label.text = "Drag to orbit, wheel to zoom, B toggles build mode."
 	vbox.add_child(status_label)
 
 	file_dialog = FileDialog.new()
@@ -78,11 +78,7 @@ func _update_model_button() -> void:
 		model_button.text = "Model: Classic"
 
 func _update_view_button() -> void:
-	if player_node != null and player_node.has_method("get_camera_mode_name"):
-		var mode_name: String = str(player_node.call("get_camera_mode_name"))
-		view_button.text = "View: %s" % mode_name
-	else:
-		view_button.text = "View"
+	view_button.text = "Reset Camera"
 
 func _on_choose_skin_button_pressed() -> void:
 	var downloads: String = OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
@@ -121,7 +117,6 @@ func _on_model_button_pressed() -> void:
 	status_label.text = "Arm model changed."
 
 func _on_view_button_pressed() -> void:
-	if player_node != null and player_node.has_method("cycle_camera_mode"):
-		player_node.call("cycle_camera_mode")
-		_update_view_button()
-		status_label.text = "Camera: %s" % view_button.text.replace("View: ", "")
+	if player_node != null and player_node.has_method("reset_room_camera"):
+		player_node.call("reset_room_camera")
+		status_label.text = "Camera reset to the room-view shot."
