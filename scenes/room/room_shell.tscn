@@ -1,0 +1,54 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/room/room_shell.gd" id="1_room_shell"]
+
+[node name="RoomShell" type="Node3D"]
+script = ExtResource("1_room_shell")
+
+[node name="floor" type="Node3D" parent="."]
+
+[node name="Visual" type="MeshInstance3D" parent="floor"]
+
+[node name="Collider" type="StaticBody3D" parent="floor"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="floor/Collider"]
+
+[node name="wall_back" type="Node3D" parent="."]
+
+[node name="Visual" type="MeshInstance3D" parent="wall_back"]
+
+[node name="Collider" type="StaticBody3D" parent="wall_back"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="wall_back/Collider"]
+
+[node name="wall_left" type="Node3D" parent="."]
+
+[node name="Visual" type="MeshInstance3D" parent="wall_left"]
+
+[node name="Collider" type="StaticBody3D" parent="wall_left"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="wall_left/Collider"]
+
+[node name="wall_front" type="Node3D" parent="."]
+
+[node name="Visual" type="MeshInstance3D" parent="wall_front"]
+
+[node name="Collider" type="StaticBody3D" parent="wall_front"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="wall_front/Collider"]
+
+[node name="wall_right" type="Node3D" parent="."]
+
+[node name="Visual" type="MeshInstance3D" parent="wall_right"]
+
+[node name="Collider" type="StaticBody3D" parent="wall_right"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="wall_right/Collider"]
+
+[node name="ceiling" type="Node3D" parent="."]
+
+[node name="Visual" type="MeshInstance3D" parent="ceiling"]
+
+[node name="Collider" type="StaticBody3D" parent="ceiling"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ceiling/Collider"]
