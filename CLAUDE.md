@@ -1,19 +1,19 @@
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
-**Risk It Meow: Godot Port**
+**Risk It Meow**
 
-Risk It Meow is the Godot port of the currently shipped React Three Fiber game in `Z:\FAHHHH` (`Risk It All: Cozy Couple Room`). The goal is to reproduce the existing room-building, shared-room, pet, memory, activity, and authoring experience in a Godot runtime that is more stable and responsive in the browser than the current R3F stack.
+Risk It Meow is a browser-first Godot game focused on a local cozy room sandbox with Minecraft-style presentation, room decoration, and sample cats. The immediate goal is not to port the full shared-room/Firebase/couple stack from `Z:\FAHHHH`; it is to port the local room-builder slice first: walls, roof, occlusion, grid placement, and floor/wall/ceiling/surface decor systems, while keeping the current direct player/camera controls.
 
-**Core Value:** The Godot runtime can deliver the current cozy shared-room experience with better browser performance and no meaningful regressions from the shipped R3F game.
+**Core Value:** The player can smoothly walk around a cozy room in the browser and decorate it with reliable local-only building systems.
 
 ### Constraints
 
-- **Platform**: Browser-first Godot delivery - the port must stay viable for web export because that is the reason for the engine move.
-- **Parity baseline**: The shipped runtime in `Z:\FAHHHH` is the feature baseline - not future roadmap ideas and not stale prototypes.
-- **Architecture**: Preserve core domain invariants from the source game, especially owned-vs-placed furniture, anchored surface decor, four-wall placement, canonical shared-room state, and authoring/runtime boundaries.
-- **Migration strategy**: Use phased delivery with explicit parity checkpoints - rewriting blindly would create regressions faster than it creates value.
-- **Performance**: The Godot port must outperform or out-stabilize the current R3F runtime on the target browsers/devices - a same-performance port is not enough.
+- **Platform**: Browser-first Godot delivery - the room-builder slice must stay viable for web export.
+- **Scope**: Local-only milestone - no backend, no shared-room, no Firebase, no couple systems.
+- **Controls**: Keep the current direct movement/camera approach - do not reintroduce click-to-move while building this slice.
+- **Architecture**: Reuse and extend the existing Godot prototype instead of restarting from zero.
+- **Parity boundary**: Only port the local room-builder, shell, occlusion, and sample-cat systems that matter to this milestone.
 <!-- GSD:project-end -->
 
 <!-- GSD:stack-start source:codebase/STACK.md -->

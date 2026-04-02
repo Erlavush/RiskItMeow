@@ -11,5 +11,7 @@ Use `CLAUDE.md` as the generated project guidance source for this repo.
 
 ## Project Focus
 
-- This repo is the Godot port of the shipped R3F runtime in `Z:\FAHHHH`.
-- Preserve source runtime invariants during porting, especially owned-vs-placed furniture, anchored surface decor, four-wall placement, shared-room boundaries, and browser-first delivery.
+- This repo currently targets a local-only Godot room-builder slice.
+- Do not add Firebase, shared-room sync, partner presence, couple joins, or other backend-dependent systems unless the user explicitly restores that scope.
+- Do not reintroduce click-to-move; preserve the current direct keyboard/mouse movement and camera modes.
+- Use `Z:\FAHHHH` only as a reference for the local room shell, wall/roof occlusion, floor/wall/ceiling/surface placement, and sample cat behavior that matter to Phase 1.
