@@ -13,7 +13,7 @@ var build_mode_controller: Node
 
 @onready var rig: MinecraftRig = $MinecraftRig
 @onready var legacy_camera: Camera3D = $CameraPivot/SpringArm3D/Camera3D
-@onready var room_camera_controller: RoomViewCameraController = get_node_or_null(room_camera_controller_path) as RoomViewCameraController
+@onready var room_camera_controller: Node = get_node_or_null(room_camera_controller_path)
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -111,10 +111,10 @@ func set_build_mode_controller(controller: Node) -> void:
 	build_mode_controller = controller
 
 func get_active_camera() -> Camera3D:
-	if room_camera_controller != null:
-		return room_camera_controller.get_camera()
+	if room_camera_controller != null and room_camera_controller.has_method("get_camera"):
+		return room_camera_controller.call("get_camera") as Camera3D
 	return legacy_camera
 
 func reset_room_camera() -> void:
-	if room_camera_controller != null:
+	if room_camera_controller != null and room_camera_controller.has_method("reset_camera"):
 		room_camera_controller.reset_camera()
