@@ -11,8 +11,8 @@
 
 ### Room View Camera
 
-- [ ] **CAM-01**: The game uses one stable room-view orbit camera aimed at the room center instead of the current freecam / third-person / first-person stack.
-- [ ] **CAM-02**: Camera orbit and zoom feel stable enough for gameplay and build mode, with no obvious shake during normal room use.
+- [x] **CAM-01**: The game uses one stable room-view orbit camera aimed at the room center instead of the current freecam / third-person / first-person stack.
+- [x] **CAM-02**: Camera orbit and zoom feel stable enough for gameplay and build mode, with no obvious shake during normal room use.
 
 ### Room Shell
 
@@ -65,8 +65,8 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CTRL-01 | Phase 1 | Complete |
-| CAM-01 | Phase 2 | Pending |
-| CAM-02 | Phase 2 | Pending |
+| CAM-01 | Phase 2 | Complete |
+| CAM-02 | Phase 2 | Complete |
 | SHELL-01 | Phase 1 | Complete |
 | SHELL-02 | Phase 1 | Complete |
 | PLAC-01 | Phase 1 | Complete |

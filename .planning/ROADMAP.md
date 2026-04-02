@@ -44,7 +44,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Replace the current camera stack with a stable room-view orbit camera
+- [x] 02-01: Replace the current camera stack with a stable room-view orbit camera
 - [ ] 02-02: Upgrade the room shell from white-box prototype to themed starter room
 - [ ] 02-03: Retune lighting, occlusion, and verification around the new room view
 
