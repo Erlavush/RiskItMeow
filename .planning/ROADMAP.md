@@ -2,11 +2,11 @@
 
 ## Milestones
 
-- [ ] **v1.0 Local Room Builder Foundation** - Phases `1` and `2` establish the local room sandbox, then stabilize the room-view camera and presentation.
+- [ ] **v1.0 Local Room Builder Foundation** - Phases `1` and `2` establish the local room sandbox and stabilize the room-view camera baseline.
 
 ## Overview
 
-Milestone v1.0 is intentionally narrow. It does not include Firebase, shared-room sync, partner presence, couple joining, or click-to-move controls. The milestone now targets two local-only slices: Phase 1 delivered the first room-builder foundation, and Phase 2 upgrades that foundation with the `FAHHHH` room-view camera model plus a presentable themed room shell.
+Milestone v1.0 is intentionally narrow. It does not include Firebase, shared-room sync, partner presence, couple joining, or click-to-move controls. The milestone now targets two local-only slices: Phase 1 delivered the first room-builder foundation, and Phase 2 stops at the stable `FAHHHH`-style room-view camera baseline. Future feature work will be requested manually instead of auto-continuing the removed 02-02 / 02-03 plan bundle.
 
 **Execution guardrail:** Any implementation that drifts into backend, multiplayer, or couple systems is out of scope for this milestone.
 
@@ -31,26 +31,23 @@ Plans:
 - [x] 01-03: Add sample cats and integrate the local room-builder slice
 
 ### Phase 2: Room-View Camera and Visual Fidelity
-**Goal**: Replace the current shaky multi-camera prototype with the single room-view orbit camera from `FAHHHH`, then upgrade the room shell from a plain white box into a themed, readable starter room while preserving local-only scope and direct movement.
+**Goal**: Replace the current shaky multi-camera prototype with the single room-view orbit camera from `FAHHHH` while preserving local-only scope and direct movement. Broader room-presentation follow-up work is intentionally deferred until it is requested manually.
 **Depends on**: Phase 1
-**Requirements**: [CTRL-01, CAM-01, CAM-02, VIS-01, VIS-02, VIS-03, PERF-01, SCOPE-01]
+**Requirements**: [CTRL-01, CAM-01, CAM-02, PERF-01, SCOPE-01]
 **UI hint**: yes
 **Success Criteria**:
   1. The runtime uses one stable room-centered orbit camera instead of freecam / third-person / first-person switching.
   2. Build mode, occlusion, and player control remain usable with the new camera baseline and no click-to-move is introduced.
-  3. The room shell no longer reads as a plain hollow white box and instead uses a themed floor, wall, ceiling, and trim presentation.
-  4. Lighting and atmosphere give the room readable depth while staying browser-friendly.
-  5. Cat redesign work remains explicitly deferred so the phase stays focused on camera and room fidelity.
-**Plans**: 3 plans
+  3. The project remains local-only and does not drift into backend, multiplayer, or couple systems.
+  4. Any room-presentation or cat follow-up work is explicitly deferred until it is requested manually.
+**Plans**: 1 plan
 
 Plans:
 - [x] 02-01: Replace the current camera stack with a stable room-view orbit camera
-- [ ] 02-02: Upgrade the room shell from white-box prototype to themed starter room
-- [ ] 02-03: Retune lighting, occlusion, and verification around the new room view
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Local Room Shell, Placement, and Sample Cats | v1.0 | 3/3 | Complete   | 2026-04-02 |
-| 2. Room-View Camera and Visual Fidelity | v1.0 | 1/3 | In Progress |  |
+| 2. Room-View Camera and Visual Fidelity | v1.0 | 1/1 | Complete   | 2026-04-02 |

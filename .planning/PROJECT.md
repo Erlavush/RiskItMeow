@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Risk It Meow is a browser-first Godot game focused on a local cozy room sandbox with Minecraft-style presentation, room decoration, and sample cats. Phase 1 delivered the first playable local room-builder slice. The immediate goal for Phase 2 is to replace the shaky prototype camera stack with the stable room-view orbit camera style from `Z:\FAHHHH`, then upgrade the white-box shell into a themed room with stronger floor, wall, ceiling, trim, and lighting presentation while keeping the project local-only.
+Risk It Meow is a browser-first Godot game focused on a local cozy room sandbox with Minecraft-style presentation, room decoration, and sample cats. Phase 1 delivered the first playable local room-builder slice. Phase 2 has now been narrowed and stopped at the stable room-view orbit camera baseline. Future features will be requested and built manually, one change at a time, instead of continuing a broad preplanned porting pass.
 
 ## Core Value
 
@@ -23,17 +23,14 @@ The player can smoothly walk around a cozy room in the browser and decorate it w
 
 ### Active
 
-- [ ] Godot replaces the current freecam / third-person / first-person stack with one stable room-view orbit camera based on the `FAHHHH` room camera.
-- [ ] Godot keeps direct keyboard movement and local build controls while removing the current shaky camera behavior.
-- [ ] The room shell replaces the current plain white floor, walls, and ceiling with a themed starter room presentation.
-- [ ] The room shell adds trim, floor staging, and stronger visual depth so it no longer reads like a hollow white box.
-- [ ] The local room-builder slice keeps browser-friendly rendering and stays local-only while Phase 2 focuses on camera and room fidelity.
+- [ ] Future room, cat, and presentation changes are defined manually per user request instead of continuing the old bulk Phase 2 plan.
 
 ### Out of Scope
 
 - Firebase, authentication, shared-room sync, partner presence, or any couple-join flow - explicitly removed from the current target.
 - Click-to-move player locomotion from the source runtime - the current direct movement system stays in place.
 - Full feature parity with the source R3F game at this stage - the current milestone is still a focused local room-view slice.
+- Bulk 1:1 feature porting from the source runtime - future work now proceeds one manual feature request at a time.
 - Cat model and behavior overhauls - explicitly deferred until after camera and room presentation are improved.
 
 ## Context
@@ -62,6 +59,7 @@ The player can smoothly walk around a cozy room in the browser and decorate it w
 | Use the source R3F repo only as a reference for local builder systems relevant to this slice | The source repo contains much more scope than the current Godot milestone should inherit | The source repo is treated as a targeted reference for room shell, placement, occlusion, and cat behavior only. |
 | Phase 2 should replace the current camera stack with the `FAHHHH` room-view orbit camera | The current Godot camera shakes and the user wants the stable room-centered shot from the source game | The next phase is centered on a single orbit camera around the room target instead of freecam / first-person / third-person switching. |
 | Cat polish is deferred until after camera and room fidelity | The current cat placeholders are acceptable only as temporary proof-of-life content | Phase 2 excludes cat redesign and focuses on camera plus room presentation. |
+| Stop broad Phase 2 continuation after the camera baseline | The user wants future work requested manually one feature at a time instead of following the old bundled plan | Pending Phase 2 follow-up plans were removed and the repo now waits for direct feature requests. |
 
 ## Evolution
 
@@ -81,4 +79,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-02 after Phase 2 camera-and-visual-fidelity planning*
+*Last updated: 2026-04-02 after narrowing Phase 2 to the completed camera baseline*

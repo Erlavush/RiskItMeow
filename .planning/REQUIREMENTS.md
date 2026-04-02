@@ -7,7 +7,7 @@
 
 ### Controls
 
-- [x] **CTRL-01**: Player moves with the current direct keyboard/mouse controller and camera modes instead of a click-to-move system.
+- [x] **CTRL-01**: Player moves with the current direct keyboard/mouse controller and room-view camera instead of a click-to-move system.
 
 ### Room View Camera
 
@@ -76,17 +76,17 @@
 | PLAC-05 | Phase 1 | Complete |
 | CATS-01 | Phase 1 | Complete |
 | CATS-02 | Phase 1 | Complete |
-| VIS-01 | Phase 2 | Pending |
-| VIS-02 | Phase 2 | Pending |
-| VIS-03 | Phase 2 | Pending |
+| VIS-01 | Manual / TBD | Pending |
+| VIS-02 | Manual / TBD | Pending |
+| VIS-03 | Manual / TBD | Pending |
 | PERF-01 | Phase 1 | Complete |
 | SCOPE-01 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 17 total
-- Mapped to phases: 17
-- Unmapped: 0
+- Mapped to phases: 14
+- Unmapped: 3
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after Phase 2 plan 02-01 execution*
+*Last updated: 2026-04-02 after removing the pending bundled Phase 2 follow-up plans*

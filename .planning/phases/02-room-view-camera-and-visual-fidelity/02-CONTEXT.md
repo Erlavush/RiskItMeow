@@ -1,8 +1,10 @@
 # Phase 2: Room-View Camera and Visual Fidelity - Context
 
 **Gathered:** 2026-04-02
-**Status:** Ready for planning and execution
+**Status:** Historical context only after manual scope reset
 **Source:** User direction after Phase 1 completion plus targeted inspection of the `FAHHHH` room-view camera, shell, floor, and lighting systems
+
+> Note 2026-04-02: The broader 02-02 / 02-03 continuation described below was intentionally removed. Phase 2 stopped at the completed 02-01 camera baseline, and future features will be requested manually one by one.
 
 <domain>
 ## Phase Boundary

@@ -1,5 +1,7 @@
 # Phase 2 Research: Room-View Camera and Visual Fidelity
 
+> Note 2026-04-02: This research captured the broader room-visual-fidelity direction before the user reset to manual feature-by-feature requests. Only the 02-01 camera-baseline slice was executed; the pending 02-02 / 02-03 continuation was removed.
+
 ## Objective
 
 Answer: "What do we need to copy or adapt from `FAHHHH` to fix the current camera and upgrade the room presentation without widening scope?"

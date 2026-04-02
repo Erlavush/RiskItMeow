@@ -101,8 +101,8 @@ None - the new room camera is local-only and does not introduce external service
 
 ## Next Phase Readiness
 
-- The main scene now has one stable room camera baseline, which clears the biggest blocker for themed shell work in `02-02`.
-- Build preview and occlusion are already following the shared room camera, so later shell and lighting changes can iterate on readability without another camera rewrite.
+- The main scene now has one stable room camera baseline, so any later room shell, lighting, or cat-presentation changes can be requested independently without reopening the old multi-camera problem.
+- Build preview and occlusion are already following the shared room camera, which makes future manual feature work safer even though the bundled 02-02 / 02-03 continuation was removed.
 
 ---
 *Phase: 02-room-view-camera-and-visual-fidelity*
