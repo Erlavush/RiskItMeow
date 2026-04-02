@@ -24,8 +24,8 @@
 
 ### Cats
 
-- [ ] **CATS-01**: Sample cats can be spawned or shown inside the room as part of the local sandbox slice.
-- [ ] **CATS-02**: Sample cats move or idle in a readable room-safe way without relying on backend or multiplayer systems.
+- [x] **CATS-01**: Sample cats can be spawned or shown inside the room as part of the local sandbox slice.
+- [x] **CATS-02**: Sample cats move or idle in a readable room-safe way without relying on backend or multiplayer systems.
 
 ### Delivery
 
@@ -60,8 +60,8 @@
 | PLAC-03 | Phase 1 | Complete |
 | PLAC-04 | Phase 1 | Complete |
 | PLAC-05 | Phase 1 | Complete |
-| CATS-01 | Phase 1 | Pending |
-| CATS-02 | Phase 1 | Pending |
+| CATS-01 | Phase 1 | Complete |
+| CATS-02 | Phase 1 | Complete |
 | PERF-01 | Phase 1 | Complete |
 | SCOPE-01 | Phase 1 | Complete |
 

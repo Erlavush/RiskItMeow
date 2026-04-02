@@ -28,10 +28,10 @@ Milestone v1.0 is intentionally narrow. It does not include Firebase, shared-roo
 Plans:
 - [x] 01-01: Build the enclosed room shell and camera occlusion foundation
 - [x] 01-02: Build the grid placement and anchored decor systems
-- [ ] 01-03: Add sample cats and integrate the local room-builder slice
+- [x] 01-03: Add sample cats and integrate the local room-builder slice
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Local Room Shell, Placement, and Sample Cats | v1.0 | 2/3 | In Progress|  |
+| 1. Local Room Shell, Placement, and Sample Cats | v1.0 | 3/3 | Complete   | 2026-04-02 |
