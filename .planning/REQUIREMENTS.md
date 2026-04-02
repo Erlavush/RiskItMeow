@@ -9,6 +9,11 @@
 
 - [x] **CTRL-01**: Player moves with the current direct keyboard/mouse controller and camera modes instead of a click-to-move system.
 
+### Room View Camera
+
+- [ ] **CAM-01**: The game uses one stable room-view orbit camera aimed at the room center instead of the current freecam / third-person / first-person stack.
+- [ ] **CAM-02**: Camera orbit and zoom feel stable enough for gameplay and build mode, with no obvious shake during normal room use.
+
 ### Room Shell
 
 - [x] **SHELL-01**: The Godot room has a floor, four walls, and a roof/ceiling that define a readable enclosed interior space.
@@ -26,6 +31,12 @@
 
 - [x] **CATS-01**: Sample cats can be spawned or shown inside the room as part of the local sandbox slice.
 - [x] **CATS-02**: Sample cats move or idle in a readable room-safe way without relying on backend or multiplayer systems.
+
+### Presentation
+
+- [ ] **VIS-01**: The room shell replaces the current plain white floor, walls, and ceiling with a themed material palette.
+- [ ] **VIS-02**: The room adds trim, floor staging, and shell detailing so it no longer reads like a hollow white box.
+- [ ] **VIS-03**: Lighting, backdrop, and occlusion tuning make the room readable and atmospheric while staying browser-friendly.
 
 ### Delivery
 
@@ -47,12 +58,15 @@
 | Shared-room or couple-join gameplay | Explicitly removed from current target |
 | Click-to-move locomotion | Rejected in favor of the existing movement system |
 | Full parity with every shipped R3F system right now | Current milestone is intentionally narrowed to the local room-builder slice |
+| Cat visual overhaul in Phase 2 | Explicitly deferred until after camera and room fidelity improve |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CTRL-01 | Phase 1 | Complete |
+| CAM-01 | Phase 2 | Pending |
+| CAM-02 | Phase 2 | Pending |
 | SHELL-01 | Phase 1 | Complete |
 | SHELL-02 | Phase 1 | Complete |
 | PLAC-01 | Phase 1 | Complete |
@@ -62,14 +76,17 @@
 | PLAC-05 | Phase 1 | Complete |
 | CATS-01 | Phase 1 | Complete |
 | CATS-02 | Phase 1 | Complete |
+| VIS-01 | Phase 2 | Pending |
+| VIS-02 | Phase 2 | Pending |
+| VIS-03 | Phase 2 | Pending |
 | PERF-01 | Phase 1 | Complete |
 | SCOPE-01 | Phase 1 | Complete |
 
 **Coverage:**
-- v1 requirements: 12 total
-- Mapped to phases: 12
+- v1 requirements: 17 total
+- Mapped to phases: 17
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after local-only room-builder scope correction*
+*Last updated: 2026-04-02 after Phase 2 camera-and-visual-fidelity planning*

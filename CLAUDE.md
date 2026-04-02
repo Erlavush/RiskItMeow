@@ -3,7 +3,7 @@
 
 **Risk It Meow**
 
-Risk It Meow is a browser-first Godot game focused on a local cozy room sandbox with Minecraft-style presentation, room decoration, and sample cats. The immediate goal is not to port the full shared-room/Firebase/couple stack from `Z:\FAHHHH`; it is to port the local room-builder slice first: walls, roof, occlusion, grid placement, and floor/wall/ceiling/surface decor systems, while keeping the current direct player/camera controls.
+Risk It Meow is a browser-first Godot game focused on a local cozy room sandbox with Minecraft-style presentation, room decoration, and sample cats. Phase 1 delivered the first local room-builder slice. The immediate goal for Phase 2 is to replace the current shaky camera stack with the stable room-view orbit camera used in `Z:\FAHHHH`, then upgrade the room shell from a plain white box into a themed starter room while staying local-only.
 
 **Core Value:** The player can smoothly walk around a cozy room in the browser and decorate it with reliable local-only building systems.
 
@@ -11,7 +11,7 @@ Risk It Meow is a browser-first Godot game focused on a local cozy room sandbox 
 
 - **Platform**: Browser-first Godot delivery - the room-builder slice must stay viable for web export.
 - **Scope**: Local-only milestone - no backend, no shared-room, no Firebase, no couple systems.
-- **Controls**: Keep the current direct movement/camera approach - do not reintroduce click-to-move while building this slice.
+- **Controls**: Keep direct keyboard movement, but replace the current multi-camera prototype with a single room-view orbit camera - do not reintroduce click-to-move.
 - **Architecture**: Reuse and extend the existing Godot prototype instead of restarting from zero.
 - **Parity boundary**: Only port the local room-builder, shell, occlusion, and sample-cat systems that matter to this milestone.
 <!-- GSD:project-end -->
