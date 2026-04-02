@@ -7,12 +7,12 @@
 
 ### Controls
 
-- [ ] **CTRL-01**: Player moves with the current direct keyboard/mouse controller and camera modes instead of a click-to-move system.
+- [x] **CTRL-01**: Player moves with the current direct keyboard/mouse controller and camera modes instead of a click-to-move system.
 
 ### Room Shell
 
-- [ ] **SHELL-01**: The Godot room has a floor, four walls, and a roof/ceiling that define a readable enclosed interior space.
-- [ ] **SHELL-02**: Camera-driven wall and roof occlusion keeps the room interior visible without breaking the shell structure.
+- [x] **SHELL-01**: The Godot room has a floor, four walls, and a roof/ceiling that define a readable enclosed interior space.
+- [x] **SHELL-02**: Camera-driven wall and roof occlusion keeps the room interior visible without breaking the shell structure.
 
 ### Placement
 
@@ -29,8 +29,8 @@
 
 ### Delivery
 
-- [ ] **PERF-01**: The local room-builder slice remains browser-first and performs reliably enough to justify using Godot for this foundation.
-- [ ] **SCOPE-01**: The milestone contains no Firebase, shared-room sync, couple joining, or backend-dependent flows.
+- [x] **PERF-01**: The local room-builder slice remains browser-first and performs reliably enough to justify using Godot for this foundation.
+- [x] **SCOPE-01**: The milestone contains no Firebase, shared-room sync, couple joining, or backend-dependent flows.
 
 ## v2 Requirements
 
@@ -52,9 +52,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CTRL-01 | Phase 1 | Pending |
-| SHELL-01 | Phase 1 | Pending |
-| SHELL-02 | Phase 1 | Pending |
+| CTRL-01 | Phase 1 | Complete |
+| SHELL-01 | Phase 1 | Complete |
+| SHELL-02 | Phase 1 | Complete |
 | PLAC-01 | Phase 1 | Pending |
 | PLAC-02 | Phase 1 | Pending |
 | PLAC-03 | Phase 1 | Pending |
@@ -62,8 +62,8 @@
 | PLAC-05 | Phase 1 | Pending |
 | CATS-01 | Phase 1 | Pending |
 | CATS-02 | Phase 1 | Pending |
-| PERF-01 | Phase 1 | Pending |
-| SCOPE-01 | Phase 1 | Pending |
+| PERF-01 | Phase 1 | Complete |
+| SCOPE-01 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total
