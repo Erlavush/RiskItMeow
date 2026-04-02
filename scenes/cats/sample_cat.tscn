@@ -1,0 +1,36 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/cats/sample_cat.gd" id="1_sample_cat"]
+
+[node name="SampleCat" type="Node3D"]
+script = ExtResource("1_sample_cat")
+
+[node name="VisualRoot" type="Node3D" parent="."]
+
+[node name="BodyPivot" type="Node3D" parent="VisualRoot"]
+
+[node name="Body" type="MeshInstance3D" parent="VisualRoot/BodyPivot"]
+
+[node name="Stripe" type="MeshInstance3D" parent="VisualRoot/BodyPivot"]
+
+[node name="HeadPivot" type="Node3D" parent="VisualRoot/BodyPivot"]
+
+[node name="Head" type="MeshInstance3D" parent="VisualRoot/BodyPivot/HeadPivot"]
+
+[node name="EarLeft" type="MeshInstance3D" parent="VisualRoot/BodyPivot/HeadPivot"]
+
+[node name="EarRight" type="MeshInstance3D" parent="VisualRoot/BodyPivot/HeadPivot"]
+
+[node name="Nose" type="MeshInstance3D" parent="VisualRoot/BodyPivot/HeadPivot"]
+
+[node name="TailPivot" type="Node3D" parent="VisualRoot/BodyPivot"]
+
+[node name="Tail" type="MeshInstance3D" parent="VisualRoot/BodyPivot/TailPivot"]
+
+[node name="PawFrontLeft" type="MeshInstance3D" parent="VisualRoot/BodyPivot"]
+
+[node name="PawFrontRight" type="MeshInstance3D" parent="VisualRoot/BodyPivot"]
+
+[node name="PawBackLeft" type="MeshInstance3D" parent="VisualRoot/BodyPivot"]
+
+[node name="PawBackRight" type="MeshInstance3D" parent="VisualRoot/BodyPivot"]
