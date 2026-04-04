@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: manual-feature-buildout
 status: paused
-stopped_at: Placement prototype, camera smoothing, and build polish complete; waiting for the next single feature request
-last_updated: "2026-04-02T23:42:44+08:00"
-last_activity: 2026-04-02 -- added the runtime chair placement prototype, polished gizmo/feedback, and corrected camera/build interactions
+stopped_at: Editor preview now mirrors saved room layout and developer environment preset; awaiting the next requested feature
+last_updated: "2026-04-04T00:00:00+08:00"
+last_activity: 2026-04-04 -- added editor preview sync for the saved room layout and developer environment preset, then refreshed docs
 progress:
   total_phases: 0
   completed_phases: 0
@@ -25,14 +25,18 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: none
-Status: Paused - placement feature set complete, awaiting the next feature request
-Last activity: 2026-04-02 -- runtime placement, camera polish, and build feedback pass completed
+Status: Paused - editor preview now mirrors saved room and developer state, awaiting the next feature
+Last activity: 2026-04-04 -- added editor preview sync for the saved room layout and developer environment preset, then refreshed docs
 
 ## Baseline Snapshot
 
-- Runtime scene uses one player, one floor-only room shell, one room-view orbit camera, and one placement manager.
-- The live build surface is a 10x10 checkered floor with a `Simple Wood Chair` inventory entry, runtime preview, gizmo drag, and confirm/cancel popup.
-- Walls and ceiling remain hidden in the live scene.
+- Runtime scene uses one player, one 8x8 room shell with a single north wall, one room-view orbit camera, one placement manager, and one developer environment panel.
+- The live build surface uses a pixelated dark-brown `32x32` linen tile repeated once per floor block with random rotation, plus a checkerboard fallback finish in the UI.
+- Placement inventory currently includes `Simple Wood Chair`, `Office Chair`, `Office Desk + Computer`, `Fridge`, and `Window`, with runtime preview, gizmo drag, Build/Edit modes, double-click edit selection, move/duplicate/delete popup actions, local room-layout persistence, and wall-mounted placement support.
+- The developer panel can tune lighting, fog, glow, and post-adjustment live and persists locally through `user://developer_environment_settings.cfg`.
+- Room layouts now persist locally through `user://room_layout.json`, including placed items, transforms, and floor finish.
+- The editor 3D preview now mirrors both of those local saved states through tool-mode preview loaders instead of baking them into the scene file.
+- Window placement now rebuilds the target wall into segmented geometry so the placed window leaves a real wall opening.
 - No external source project is an active reference or port target.
 
 ## Rules For The Next Conversation
@@ -46,6 +50,19 @@ Last activity: 2026-04-02 -- runtime placement, camera polish, and build feedbac
 
 ## Session Continuity
 
-Last session: 2026-04-02
-Stopped at: Placement prototype, camera smoothing, and build polish complete
-Resume command: Ask for the next feature directly
+Last session: 2026-04-04
+Stopped at: Editor preview sync for saved room and developer state implemented
+Resume command: Continue from the current persisted build/edit placement baseline, with editor preview sync active, and implement the next requested feature
+
+## Accumulated Context
+
+### Pending Todos
+
+- 1 pending todo in `.planning/todos/pending/`
+- `2026-04-04-add-bake-feature-for-saved-state.md` - Add bake feature for saved state
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260404-nn8 | Add developer environment tuning panel for lighting and post-processing | 2026-04-04 | working-tree | [260404-nn8-add-developer-environment-tuning-panel-f](./quick/260404-nn8-add-developer-environment-tuning-panel-f/) |
