@@ -1,8 +1,17 @@
+@tool
 class_name PlacementManager
 extends Node3D
 
+signal room_layout_visuals_changed
+
+const RoomConstants := preload("res://scripts/room/room_constants.gd")
+const PlacementInventoryCatalog := preload("res://scripts/placement/placement_inventory_catalog.gd")
+const PlacementGizmoFactory := preload("res://scripts/placement/placement_gizmo_factory.gd")
+const PlacementRoomLayoutStore := preload("res://scripts/placement/placement_room_layout_store.gd")
+const PlacementSurfaceQueries := preload("res://scripts/placement/placement_surface_queries.gd")
+const PlacementUiStyles := preload("res://scripts/placement/placement_ui_styles.gd")
+const PlacementValidator := preload("res://scripts/placement/placement_validator.gd")
 const GRID_SIZE := 1.0
-const CHAIR_INITIAL_STOCK := 3
 const UI_MARGIN := Vector2(16.0, 140.0)
 const POPUP_MARGIN := 10.0
 const GIZMO_RING_RADIUS := 0.6
@@ -11,17 +20,29 @@ const GIZMO_COLLISION_LAYER := 1 << 4
 const GIZMO_DISTANCE_SCALE := 0.08
 const GIZMO_MIN_SCALE := 0.92
 const GIZMO_MAX_SCALE := 1.34
+const FLOOR_STYLE_COZY_BROWN := 0
+const FLOOR_STYLE_CHECKERBOARD := 1
+const WALL_SNAP_SIZE := 0.25
+const EDITOR_PREVIEW_POLL_SECONDS := 0.6
+const EDITOR_MODE_BUILD := "build"
+const EDITOR_MODE_EDIT := "edit"
+const PLACEMENT_SESSION_NONE := ""
+const PLACEMENT_SESSION_NEW := "new"
+const PLACEMENT_SESSION_EDIT := "edit"
+const PLACEMENT_SESSION_DUPLICATE := "duplicate"
 
 const GridOverlayShader := preload("res://shaders/grid_overlay.gdshader")
-const SimpleWoodChairScript := preload("res://scripts/placement/simple_wood_chair.gd")
+
+var _inventory_item_defs: Array[Dictionary] = PlacementInventoryCatalog.build_item_defs()
 
 @export var room_shell_path: NodePath
 @export var room_camera_controller_path: NodePath
 @export var player_path: NodePath
 
-var _chair_stock: int = CHAIR_INITIAL_STOCK
-var _placed_chair_count: int = 0
+var _item_stock: Dictionary = {}
+var _placed_item_counts: Dictionary = {}
 var _manual_grid_visible := false
+var _editor_mode := EDITOR_MODE_BUILD
 var _placement_active := false
 var _placement_valid := false
 var _placement_issue_code := ""
@@ -31,6 +52,10 @@ var _drag_mode := ""
 var _drag_start_position := Vector3.ZERO
 var _drag_start_rotation_y := 0.0
 var _drag_rotation_start_angle := 0.0
+var _active_item_id := ""
+var _active_surface_name := RoomConstants.FLOOR_SURFACE
+var _placement_session := PLACEMENT_SESSION_NONE
+var _editing_original_transform := Transform3D.IDENTITY
 
 var _room_shell: RoomShell
 var _room_camera_controller: Node
@@ -38,7 +63,7 @@ var _player: Node
 var _placed_items_root: Node3D
 var _grid_overlay: MeshInstance3D
 var _gizmo_root: Node3D
-var _preview_chair: SimpleWoodChair
+var _preview_item: SimpleWoodChair
 var _placement_query_shape := BoxShape3D.new()
 var _gizmo_handle_nodes := {}
 var _gizmo_handle_materials := {}
@@ -47,35 +72,81 @@ var _gizmo_handle_base_colors := {}
 var _ui_layer: CanvasLayer
 var _ui_root: Control
 var _inventory_panel: PanelContainer
-var _chair_button: Button
-var _stock_label: Label
+var _inventory_buttons: Dictionary = {}
+var _inventory_stock_labels: Dictionary = {}
+var _mode_buttons: Dictionary = {}
+var _floor_style_buttons: Dictionary = {}
+var _panel_title_label: Label
+var _mode_label: Label
 var _status_label: Label
+var _floor_style_label: Label
 var _grid_toggle_button: Button
+var _save_button: Button
+var _load_button: Button
+var _clear_room_button: Button
 var _popup_panel: PanelContainer
 var _popup_status_label: Label
 var _popup_hint_label: Label
 var _confirm_button: Button
 var _cancel_button: Button
+var _duplicate_button: Button
+var _delete_button: Button
+var _popup_edit_row: HBoxContainer
+var _editor_preview_poll_time := 0.0
+var _editor_preview_layout_signature := ""
+var _editor_default_floor_style := FLOOR_STYLE_COZY_BROWN
+var _wall_openings_signature := ""
+var _popup_visual_signature := ""
+var _wall_surface_cutaway_states: Dictionary = {
+	RoomConstants.WALL_BACK: false,
+	RoomConstants.WALL_LEFT: false,
+	RoomConstants.WALL_FRONT: false,
+	RoomConstants.WALL_RIGHT: false,
+}
 
 func _ready() -> void:
 	_room_shell = get_node_or_null(room_shell_path) as RoomShell
 	_room_camera_controller = get_node_or_null(room_camera_controller_path)
 	_player = get_node_or_null(player_path)
+	_initialize_inventory_state()
 
-	_placed_items_root = Node3D.new()
-	_placed_items_root.name = "PlacedItems"
-	add_child(_placed_items_root)
+	_placed_items_root = get_node_or_null("PlacedItems") as Node3D
+	if _placed_items_root == null:
+		_placed_items_root = Node3D.new()
+		_placed_items_root.name = "PlacedItems"
+		add_child(_placed_items_root)
+
+	if Engine.is_editor_hint():
+		_editor_default_floor_style = _get_current_floor_style()
+		_load_room_layout_on_startup()
+		set_process(true)
+		return
 
 	_build_grid_overlay()
 	_build_gizmo()
 	_build_ui()
 	_sync_player_with_room()
+	_load_room_layout_on_startup()
 	_update_inventory_ui()
 	_update_status_text()
 	_update_grid_visibility()
+	_update_floor_style_ui()
+
+func _initialize_inventory_state() -> void:
+	_item_stock.clear()
+	_placed_item_counts.clear()
+	for item_def in _inventory_item_defs:
+		var item_id: String = String(item_def.get("id", ""))
+		var initial_stock: int = int(item_def.get("initial_stock", 0))
+		_item_stock[item_id] = initial_stock
+		_placed_item_counts[item_id] = 0
 
 func _process(_delta: float) -> void:
-	if not _placement_active or _preview_chair == null:
+	if Engine.is_editor_hint():
+		_process_editor_preview(_delta)
+		return
+
+	if not _placement_active or _preview_item == null:
 		_popup_panel.visible = false
 		_gizmo_root.visible = false
 		return
@@ -85,15 +156,15 @@ func _process(_delta: float) -> void:
 	else:
 		_hover_target = _drag_mode
 
-	if _preview_chair != null:
-		_preview_chair.set_hovered(_hover_target == "move" or _drag_mode == "move")
+	if _preview_item != null:
+		_preview_item.set_hovered(_hover_target == "move" or _drag_mode == "move")
 
 	_update_gizmo_hover_state()
 	_update_popup_position()
 	_update_gizmo_transform()
 
 func _input(event: InputEvent) -> void:
-	if not _placement_active or _preview_chair == null or event == null:
+	if not _placement_active or _preview_item == null or event == null:
 		return
 
 	if event is InputEventMouseButton:
@@ -110,7 +181,7 @@ func _input(event: InputEvent) -> void:
 				"move", "axis_x", "axis_z", "rotate":
 					_begin_drag(target, mouse_button.position)
 					get_viewport().set_input_as_handled()
-				"floor":
+				"floor", "surface":
 					_update_preview_from_mouse(true)
 					get_viewport().set_input_as_handled()
 			return
@@ -126,7 +197,22 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _placement_active or event == null:
+	if event == null:
+		return
+
+	if event is InputEventMouseButton:
+		var mouse_button := event as InputEventMouseButton
+		if _is_edit_mode() and not _placement_active and mouse_button.button_index == MOUSE_BUTTON_LEFT and mouse_button.pressed and mouse_button.double_click:
+			if _is_pointer_over_placement_ui():
+				return
+
+			var picked_item := _pick_placeable_item(mouse_button.position)
+			if picked_item != null:
+				_begin_edit_session(picked_item)
+				get_viewport().set_input_as_handled()
+			return
+
+	if not _placement_active:
 		return
 
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -136,11 +222,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_on_confirm_button_pressed()
 				get_viewport().set_input_as_handled()
 			KEY_Q:
-				_rotate_preview(-1)
-				get_viewport().set_input_as_handled()
+				if _can_rotate_preview():
+					_rotate_preview(-1)
+					get_viewport().set_input_as_handled()
 			KEY_E, KEY_R:
-				_rotate_preview(1)
-				get_viewport().set_input_as_handled()
+				if _can_rotate_preview():
+					_rotate_preview(1)
+					get_viewport().set_input_as_handled()
 			KEY_ESCAPE:
 				_cancel_current_placement()
 				get_viewport().set_input_as_handled()
@@ -174,9 +262,38 @@ func _build_gizmo() -> void:
 	_gizmo_root.visible = false
 	add_child(_gizmo_root)
 
-	_gizmo_root.add_child(_make_arrow_gizmo("axis_x", Vector3.RIGHT, Color(0.96, 0.29, 0.24, 1.0)))
-	_gizmo_root.add_child(_make_arrow_gizmo("axis_z", Vector3.BACK, Color(0.28, 0.62, 1.0, 1.0)))
-	_gizmo_root.add_child(_make_rotation_ring("rotate"))
+	_gizmo_root.add_child(
+		PlacementGizmoFactory.make_arrow_gizmo(
+			"axis_x",
+			Vector3.RIGHT,
+			Color(0.96, 0.29, 0.24, 1.0),
+			GIZMO_COLLISION_LAYER,
+			_gizmo_handle_nodes,
+			_gizmo_handle_materials,
+			_gizmo_handle_base_colors
+		)
+	)
+	_gizmo_root.add_child(
+		PlacementGizmoFactory.make_arrow_gizmo(
+			"axis_z",
+			Vector3.BACK,
+			Color(0.28, 0.62, 1.0, 1.0),
+			GIZMO_COLLISION_LAYER,
+			_gizmo_handle_nodes,
+			_gizmo_handle_materials,
+			_gizmo_handle_base_colors
+		)
+	)
+	_gizmo_root.add_child(
+		PlacementGizmoFactory.make_rotation_ring(
+			"rotate",
+			GIZMO_RING_RADIUS,
+			GIZMO_COLLISION_LAYER,
+			_gizmo_handle_nodes,
+			_gizmo_handle_materials,
+			_gizmo_handle_base_colors
+		)
+	)
 
 func _build_ui() -> void:
 	_ui_layer = CanvasLayer.new()
@@ -192,7 +309,7 @@ func _build_ui() -> void:
 	_inventory_panel = PanelContainer.new()
 	_inventory_panel.name = "InventoryPanel"
 	_inventory_panel.position = UI_MARGIN
-	_inventory_panel.custom_minimum_size = Vector2(240.0, 0.0)
+	_inventory_panel.custom_minimum_size = Vector2(292.0, 0.0)
 	_ui_root.add_child(_inventory_panel)
 
 	var margin := MarginContainer.new()
@@ -206,27 +323,81 @@ func _build_ui() -> void:
 	layout.add_theme_constant_override("separation", 8)
 	margin.add_child(layout)
 
-	var title := Label.new()
-	title.text = "Build Inventory"
-	layout.add_child(title)
+	_panel_title_label = Label.new()
+	_panel_title_label.text = "Build & Edit"
+	layout.add_child(_panel_title_label)
 
-	_chair_button = Button.new()
-	_chair_button.text = SimpleWoodChair.DISPLAY_NAME
-	_chair_button.custom_minimum_size = Vector2(220.0, 44.0)
-	_chair_button.pressed.connect(_on_chair_button_pressed)
-	layout.add_child(_chair_button)
+	_mode_label = Label.new()
+	_mode_label.text = "Mode"
+	layout.add_child(_mode_label)
 
-	_stock_label = Label.new()
-	layout.add_child(_stock_label)
+	var mode_button_row := HBoxContainer.new()
+	mode_button_row.add_theme_constant_override("separation", 8)
+	layout.add_child(mode_button_row)
+
+	_add_mode_button(mode_button_row, "Build", EDITOR_MODE_BUILD)
+	_add_mode_button(mode_button_row, "Edit", EDITOR_MODE_EDIT)
+
+	var mode_separator := HSeparator.new()
+	layout.add_child(mode_separator)
+
+	for item_def in _inventory_item_defs:
+		_add_inventory_entry(layout, item_def)
+
+	var floor_separator := HSeparator.new()
+	layout.add_child(floor_separator)
+
+	_floor_style_label = Label.new()
+	_floor_style_label.text = "Floor Finish"
+	layout.add_child(_floor_style_label)
+
+	var floor_button_row := HBoxContainer.new()
+	floor_button_row.add_theme_constant_override("separation", 8)
+	layout.add_child(floor_button_row)
+
+	_add_floor_style_button(floor_button_row, "Brown Mat", FLOOR_STYLE_COZY_BROWN)
+	_add_floor_style_button(floor_button_row, "Checkerboard", FLOOR_STYLE_CHECKERBOARD)
 
 	_status_label = Label.new()
-	_status_label.custom_minimum_size = Vector2(220.0, 72.0)
+	_status_label.custom_minimum_size = Vector2(260.0, 84.0)
 	layout.add_child(_status_label)
 
 	_grid_toggle_button = Button.new()
-	_grid_toggle_button.custom_minimum_size = Vector2(220.0, 36.0)
+	_grid_toggle_button.custom_minimum_size = Vector2(260.0, 36.0)
 	_grid_toggle_button.pressed.connect(_on_grid_toggle_button_pressed)
 	layout.add_child(_grid_toggle_button)
+
+	var persistence_separator := HSeparator.new()
+	layout.add_child(persistence_separator)
+
+	var persistence_label := Label.new()
+	persistence_label.text = "Room Layout"
+	layout.add_child(persistence_label)
+
+	var persistence_row := HBoxContainer.new()
+	persistence_row.add_theme_constant_override("separation", 8)
+	layout.add_child(persistence_row)
+
+	_save_button = Button.new()
+	_save_button.text = "Save"
+	_save_button.custom_minimum_size = Vector2(80.0, 34.0)
+	_save_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_save_button.pressed.connect(_on_save_button_pressed)
+	persistence_row.add_child(_save_button)
+
+	_load_button = Button.new()
+	_load_button.text = "Load"
+	_load_button.custom_minimum_size = Vector2(80.0, 34.0)
+	_load_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_load_button.pressed.connect(_on_load_button_pressed)
+	persistence_row.add_child(_load_button)
+
+	_clear_room_button = Button.new()
+	_clear_room_button.text = "Clear Room"
+	_clear_room_button.custom_minimum_size = Vector2(96.0, 34.0)
+	_clear_room_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_clear_room_button.pressed.connect(_on_clear_room_button_pressed)
+	persistence_row.add_child(_clear_room_button)
 
 	_popup_panel = PanelContainer.new()
 	_popup_panel.name = "PlacementPopup"
@@ -277,12 +448,74 @@ func _build_ui() -> void:
 
 	popup_row.reparent(popup_layout)
 
+	_popup_edit_row = HBoxContainer.new()
+	_popup_edit_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_popup_edit_row.add_theme_constant_override("separation", 6)
+	popup_layout.add_child(_popup_edit_row)
+
+	_duplicate_button = Button.new()
+	_duplicate_button.text = "Duplicate"
+	_duplicate_button.custom_minimum_size = Vector2(86.0, 32.0)
+	_duplicate_button.add_theme_font_size_override("font_size", 14)
+	_duplicate_button.pressed.connect(_on_duplicate_button_pressed)
+	_popup_edit_row.add_child(_duplicate_button)
+
+	_delete_button = Button.new()
+	_delete_button.text = "Delete"
+	_delete_button.custom_minimum_size = Vector2(72.0, 32.0)
+	_delete_button.add_theme_font_size_override("font_size", 14)
+	_delete_button.pressed.connect(_on_delete_button_pressed)
+	_popup_edit_row.add_child(_delete_button)
+
 	_popup_hint_label = Label.new()
 	_popup_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_popup_hint_label.add_theme_font_size_override("font_size", 11)
 	popup_layout.add_child(_popup_hint_label)
 
+	_update_mode_ui()
 	_update_popup_visuals()
+
+func _add_mode_button(parent: HBoxContainer, title_text: String, mode_id: String) -> void:
+	var button := Button.new()
+	button.text = title_text
+	button.toggle_mode = true
+	button.custom_minimum_size = Vector2(126.0, 34.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(_on_mode_button_pressed.bind(mode_id))
+	parent.add_child(button)
+	_mode_buttons[mode_id] = button
+
+func _add_inventory_entry(parent: VBoxContainer, item_def: Dictionary) -> void:
+	var item_id: String = String(item_def.get("id", ""))
+	var display_name: String = String(item_def.get("display_name", item_id))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
+
+	var button := Button.new()
+	button.text = display_name
+	button.custom_minimum_size = Vector2(208.0, 40.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(_on_inventory_item_button_pressed.bind(item_id))
+	row.add_child(button)
+	_inventory_buttons[item_id] = button
+
+	var stock_label := Label.new()
+	stock_label.custom_minimum_size = Vector2(54.0, 0.0)
+	stock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(stock_label)
+	_inventory_stock_labels[item_id] = stock_label
+
+func _add_floor_style_button(parent: HBoxContainer, title_text: String, style_id: int) -> void:
+	var button := Button.new()
+	button.text = title_text
+	button.toggle_mode = true
+	button.custom_minimum_size = Vector2(126.0, 34.0)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.pressed.connect(_on_floor_style_button_pressed.bind(style_id))
+	parent.add_child(button)
+	_floor_style_buttons[style_id] = button
 
 func _sync_player_with_room() -> void:
 	if _room_shell == null or _player == null:
@@ -294,167 +527,735 @@ func _sync_player_with_room() -> void:
 	if _player.has_method("set_floor_y"):
 		_player.call("set_floor_y", _room_shell.get_floor_y())
 
-func _on_chair_button_pressed() -> void:
-	if _placement_active or _chair_stock <= 0:
+func _get_item_definition(item_id: String) -> Dictionary:
+	return PlacementInventoryCatalog.find_item_definition(_inventory_item_defs, item_id)
+
+func _get_item_script(item_def: Dictionary) -> Script:
+	return PlacementInventoryCatalog.get_item_script(item_def)
+
+func _get_item_display_name(item_id: String) -> String:
+	return PlacementInventoryCatalog.get_item_display_name(_inventory_item_defs, item_id)
+
+func _get_active_item_display_name() -> String:
+	return _get_item_display_name(_active_item_id if not _active_item_id.is_empty() else "item")
+
+func _is_wall_placeable(item: SimpleWoodChair) -> bool:
+	return item != null and item.get_placement_surface_kind() == RoomConstants.SURFACE_DECOR
+
+func _active_preview_is_wall_placeable() -> bool:
+	return _is_wall_placeable(_preview_item)
+
+func _can_rotate_preview() -> bool:
+	return _preview_item != null and _preview_item.supports_rotation()
+
+func _is_edit_mode() -> bool:
+	return _editor_mode == EDITOR_MODE_EDIT
+
+func _is_edit_session() -> bool:
+	return _placement_session == PLACEMENT_SESSION_EDIT
+
+func _is_stock_consuming_session() -> bool:
+	return _placement_session == PLACEMENT_SESSION_NEW or _placement_session == PLACEMENT_SESSION_DUPLICATE
+
+func _has_any_stock() -> bool:
+	return PlacementInventoryCatalog.has_any_stock(_inventory_item_defs, _item_stock)
+
+func _get_current_floor_style() -> int:
+	if _room_shell != null and _room_shell.has_method("get_floor_style"):
+		return int(_room_shell.call("get_floor_style"))
+	return FLOOR_STYLE_COZY_BROWN
+
+func _save_room_layout() -> bool:
+	var layout := PlacementRoomLayoutStore.serialize_layout(
+		_placed_items_root,
+		Callable(self, "_resolve_item_id_for_placeable"),
+		_get_current_floor_style()
+	)
+	return PlacementRoomLayoutStore.save_layout(layout)
+
+func _load_room_layout_data() -> Dictionary:
+	return PlacementRoomLayoutStore.load_layout_data()
+
+func _rebuild_room_from_layout(layout: Dictionary) -> void:
+	_clear_room(false)
+
+	if _room_shell != null and _room_shell.has_method("set_floor_style"):
+		_room_shell.call("set_floor_style", int(layout.get("floor_style", FLOOR_STYLE_COZY_BROWN)))
+
+	var raw_items: Variant = layout.get("items", [])
+	if raw_items is Array:
+		for raw_item in raw_items:
+			if typeof(raw_item) != TYPE_DICTIONARY:
+				continue
+			var item_entry: Dictionary = raw_item
+			_instantiate_saved_item(item_entry)
+
+	_sync_room_wall_openings()
+	_update_floor_style_ui()
+	_update_inventory_ui()
+	_update_status_text()
+	_notify_room_layout_visuals_changed()
+
+func _load_room_layout() -> bool:
+	var layout := _load_room_layout_data()
+	if layout.is_empty():
+		return false
+
+	_rebuild_room_from_layout(layout)
+	return true
+
+func _load_room_layout_on_startup() -> void:
+	if Engine.is_editor_hint():
+		_refresh_editor_preview_from_saved_layout(true)
+		return
+	_load_room_layout()
+
+func _process_editor_preview(delta: float) -> void:
+	_editor_preview_poll_time -= delta
+	if _editor_preview_poll_time > 0.0:
 		return
 
-	_chair_stock -= 1
-	_preview_chair = SimpleWoodChairScript.new() as SimpleWoodChair
-	_preview_chair.name = "%s Preview" % SimpleWoodChair.DISPLAY_NAME
-	add_child(_preview_chair)
-	_preview_chair.set_preview_mode(true)
-	_placement_query_shape.size = _preview_chair.get_collision_size()
+	_editor_preview_poll_time = EDITOR_PREVIEW_POLL_SECONDS
+	_refresh_editor_preview_from_saved_layout()
 
+func _refresh_editor_preview_from_saved_layout(force: bool = false) -> void:
+	var layout_signature := PlacementRoomLayoutStore.get_file_signature()
+	if not force and layout_signature == _editor_preview_layout_signature:
+		return
+
+	_editor_preview_layout_signature = layout_signature
+	if layout_signature.is_empty():
+		_clear_editor_preview_layout()
+		return
+
+	var layout := _load_room_layout_data()
+	if layout.is_empty():
+		_clear_editor_preview_layout()
+		return
+
+	_rebuild_room_from_layout(layout)
+
+func _clear_editor_preview_layout() -> void:
+	for child in _placed_items_root.get_children():
+		child.free()
+
+	_initialize_inventory_state()
+	if _room_shell != null and _room_shell.has_method("set_floor_style"):
+		_room_shell.call("set_floor_style", _editor_default_floor_style)
+	_wall_openings_signature = ""
+	_sync_room_wall_openings()
+
+func _instantiate_saved_item(item_entry: Dictionary) -> void:
+	var item_id := String(item_entry.get("item_id", ""))
+	if item_id.is_empty():
+		return
+
+	var placeable := _create_item_instance(item_id)
+	if placeable == null:
+		return
+
+	var position := PlacementRoomLayoutStore.deserialize_vector3(item_entry.get("position", {}))
+	var placement_surface := String(item_entry.get("placement_surface", RoomConstants.FLOOR_SURFACE))
+	var rotation_y := float(item_entry.get("rotation_y", 0.0))
+	if _is_wall_placeable(placeable) and RoomConstants.is_wall_surface(placement_surface):
+		rotation_y = RoomConstants.get_wall_rotation(placement_surface) + placeable.get_wall_rotation_offset()
+	var placement_transform := Transform3D(Basis.IDENTITY.rotated(Vector3.UP, rotation_y), position)
+
+	var placed_count: int = int(_placed_item_counts.get(item_id, 0)) + 1
+	_placed_item_counts[item_id] = placed_count
+	_ensure_placeable_metadata(placeable, item_id)
+	placeable.set_meta("placement_surface", placement_surface)
+	placeable.name = "%s %d" % [_get_item_display_name(item_id), placed_count]
+	_placed_items_root.add_child(placeable)
+	placeable.global_transform = placement_transform
+	placeable.set_preview_mode(false)
+	_apply_cutaway_to_placeable(placeable)
+	_item_stock[item_id] = maxi(0, int(_item_stock.get(item_id, 0)) - 1)
+
+func _autosave_room_layout() -> void:
+	_save_room_layout()
+
+func _clear_room(save_after_clear: bool = true) -> void:
+	if _placement_active:
+		_cancel_current_placement()
+
+	for child in _placed_items_root.get_children():
+		child.free()
+
+	_initialize_inventory_state()
+	_wall_openings_signature = ""
+	_sync_room_wall_openings()
+	_update_inventory_ui()
+	_update_status_text()
+	_notify_room_layout_visuals_changed()
+	if save_after_clear:
+		_autosave_room_layout()
+
+func _sync_room_wall_openings() -> bool:
+	if _room_shell == null:
+		return false
+
+	var openings_by_surface: Dictionary = {
+		RoomConstants.WALL_BACK: [],
+		RoomConstants.WALL_LEFT: [],
+		RoomConstants.WALL_FRONT: [],
+		RoomConstants.WALL_RIGHT: [],
+	}
+	for child in _placed_items_root.get_children():
+		var placeable := child as SimpleWoodChair
+		if placeable == null:
+			continue
+		if not placeable.requires_wall_opening():
+			continue
+
+		var surface_name := String(placeable.get_meta("placement_surface")) if placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
+		if _placement_active and child == _preview_item and _active_preview_is_wall_placeable():
+			surface_name = _active_surface_name
+		_append_wall_opening_for_placeable(openings_by_surface, placeable, surface_name)
+
+	if _placement_active and _preview_item != null and _preview_item.requires_wall_opening() and _preview_item.get_parent() != _placed_items_root:
+		_append_wall_opening_for_placeable(openings_by_surface, _preview_item, _active_surface_name)
+
+	var next_signature := _build_wall_openings_signature(openings_by_surface)
+	if next_signature == _wall_openings_signature:
+		return false
+
+	_wall_openings_signature = next_signature
+	if _room_shell.has_method("set_runtime_wall_openings_batch"):
+		_room_shell.call("set_runtime_wall_openings_batch", openings_by_surface)
+		return true
+
+	for surface_name in RoomConstants.WALL_SURFACES:
+		var openings: Array[Dictionary] = []
+		var raw_openings: Variant = openings_by_surface.get(surface_name, [])
+		if raw_openings is Array:
+			for raw_opening in raw_openings:
+				if typeof(raw_opening) != TYPE_DICTIONARY:
+					continue
+				openings.append(raw_opening as Dictionary)
+		_room_shell.set_runtime_wall_openings(surface_name, openings)
+	return true
+
+func set_wall_surface_cutaway(surface_name: String, is_cutaway: bool) -> void:
+	if not _wall_surface_cutaway_states.has(surface_name):
+		return
+
+	_wall_surface_cutaway_states[surface_name] = bool(is_cutaway)
+	_apply_cutaway_to_surface(surface_name)
+
+func clear_wall_surface_cutaways() -> void:
+	for surface_name in _wall_surface_cutaway_states.keys():
+		_wall_surface_cutaway_states[surface_name] = false
+		_apply_cutaway_to_surface(String(surface_name))
+
+func _apply_cutaway_to_surface(surface_name: String) -> void:
+	if _placed_items_root == null:
+		return
+
+	for child in _placed_items_root.get_children():
+		var placeable := child as SimpleWoodChair
+		if placeable == null:
+			continue
+		if _placement_active and child == _preview_item:
+			placeable.set_camera_cutaway(false)
+			continue
+		_apply_cutaway_to_placeable(placeable)
+
+func _apply_cutaway_to_placeable(placeable: SimpleWoodChair) -> void:
+	if placeable == null:
+		return
+
+	if placeable.get_placement_surface_kind() != RoomConstants.SURFACE_DECOR:
+		placeable.set_camera_cutaway(false)
+		return
+
+	var placement_surface := String(placeable.get_meta("placement_surface")) if placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
+	placeable.set_camera_cutaway(bool(_wall_surface_cutaway_states.get(placement_surface, false)))
+
+func _append_wall_opening_for_placeable(openings_by_surface: Dictionary, placeable: SimpleWoodChair, surface_name: String) -> void:
+	if placeable == null or not RoomConstants.is_wall_surface(surface_name):
+		return
+
+	var half_extents: Vector2 = placeable.get_wall_opening_half_extents()
+	var center_u: float
+	if surface_name == RoomConstants.WALL_BACK or surface_name == RoomConstants.WALL_FRONT:
+		center_u = placeable.global_position.x - _room_shell.global_position.x
+	else:
+		center_u = placeable.global_position.z - _room_shell.global_position.z
+	var center_v: float = placeable.global_position.y - _room_shell.get_wall_bottom_y()
+
+	var openings := openings_by_surface.get(surface_name, []) as Array
+	openings.append(
+		{
+			"center_u": center_u,
+			"center_v": center_v,
+			"half_u": half_extents.x,
+			"half_v": half_extents.y,
+		}
+	)
+	openings_by_surface[surface_name] = openings
+
+func _create_item_instance(item_id: String) -> SimpleWoodChair:
+	var item_def: Dictionary = _get_item_definition(item_id)
+	var item_script: Script = _get_item_script(item_def)
+	if item_def.is_empty() or item_script == null:
+		return null
+	return item_script.new() as SimpleWoodChair
+
+func _activate_preview_session(preview_item: SimpleWoodChair, item_id: String, session_kind: String, rename_preview: bool) -> void:
+	if preview_item == null:
+		return
+
+	_preview_item = preview_item
+	_active_item_id = item_id
+	_placement_session = session_kind
+	if _is_wall_placeable(_preview_item):
+		_active_surface_name = _preview_item.get_default_wall_surface()
+	else:
+		_active_surface_name = RoomConstants.FLOOR_SURFACE
+	if rename_preview:
+		_preview_item.name = "%s Preview" % _get_item_display_name(item_id)
+	_preview_item.set_preview_mode(true)
+	_placement_query_shape.size = _preview_item.get_collision_size()
 	_placement_active = true
 	_placement_valid = false
-	_update_preview_from_mouse(true)
+	_placement_issue_code = ""
+	_placement_issue_text = ""
+	_popup_visual_signature = ""
+	_hover_target = ""
+	_drag_mode = ""
+	_update_mode_ui()
 	_update_inventory_ui()
 	_update_status_text()
 	_update_grid_visibility()
 
-func _on_grid_toggle_button_pressed() -> void:
-	_manual_grid_visible = not _manual_grid_visible
-	_update_grid_visibility()
-	_update_inventory_ui()
-
-func _on_confirm_button_pressed() -> void:
-	if not _placement_active or not _placement_valid or _preview_chair == null:
+func _start_inventory_placement(item_id: String) -> void:
+	var current_stock: int = int(_item_stock.get(item_id, 0))
+	if current_stock <= 0:
 		return
 
-	var placed_chair := SimpleWoodChairScript.new() as SimpleWoodChair
-	placed_chair.name = "%s %d" % [SimpleWoodChair.DISPLAY_NAME, _placed_chair_count + 1]
-	_placed_items_root.add_child(placed_chair)
-	placed_chair.global_transform = _preview_chair.global_transform
-	placed_chair.set_preview_mode(false)
-
-	_placed_chair_count += 1
-	_finish_current_placement(false)
-
-func _on_cancel_button_pressed() -> void:
-	_cancel_current_placement()
-
-func _cancel_current_placement() -> void:
-	if not _placement_active:
+	var preview_item := _create_item_instance(item_id)
+	if preview_item == null:
 		return
 
-	_finish_current_placement(true)
+	_item_stock[item_id] = current_stock - 1
+	add_child(preview_item)
+	_activate_preview_session(preview_item, item_id, PLACEMENT_SESSION_NEW, true)
+	_update_preview_from_mouse(true)
 
-func _finish_current_placement(refund_stock: bool) -> void:
-	if refund_stock:
-		_chair_stock += 1
+func _resolve_item_id_for_placeable(placeable: SimpleWoodChair) -> String:
+	if placeable == null:
+		return ""
+	if placeable.has_meta("item_id"):
+		return String(placeable.get_meta("item_id"))
 
-	if _preview_chair != null:
-		_preview_chair.queue_free()
-		_preview_chair = null
+	var placeable_script := placeable.get_script() as Script
+	if placeable_script == null:
+		return ""
 
+	for item_def in _inventory_item_defs:
+		var item_script: Script = _get_item_script(item_def)
+		if item_script != null and item_script.resource_path == placeable_script.resource_path:
+			return String(item_def.get("id", ""))
+
+	return ""
+
+func _ensure_placeable_metadata(placeable: SimpleWoodChair, item_id: String) -> void:
+	if placeable == null or item_id.is_empty():
+		return
+	placeable.set_meta("item_id", item_id)
+	placeable.set_meta("display_name", _get_item_display_name(item_id))
+
+func _begin_edit_session(placeable: SimpleWoodChair) -> void:
+	if placeable == null:
+		return
+
+	var item_id := _resolve_item_id_for_placeable(placeable)
+	if item_id.is_empty():
+		return
+
+	_ensure_placeable_metadata(placeable, item_id)
+	_editing_original_transform = placeable.global_transform
+	_activate_preview_session(placeable, item_id, PLACEMENT_SESSION_EDIT, false)
+	_active_surface_name = String(placeable.get_meta("placement_surface")) if placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
+	if _active_preview_is_wall_placeable() and RoomConstants.is_wall_surface(_active_surface_name):
+		_preview_item.rotation.y = RoomConstants.get_wall_rotation(_active_surface_name) + _preview_item.get_wall_rotation_offset()
+	_sync_room_wall_openings()
+	_refresh_preview_validity()
+
+func _commit_new_preview_item() -> void:
+	if _preview_item == null or _active_item_id.is_empty():
+		return
+
+	var placed_count: int = int(_placed_item_counts.get(_active_item_id, 0)) + 1
+	_placed_item_counts[_active_item_id] = placed_count
+	_ensure_placeable_metadata(_preview_item, _active_item_id)
+	_preview_item.set_meta("placement_surface", _active_surface_name)
+	_preview_item.name = "%s %d" % [_get_item_display_name(_active_item_id), placed_count]
+	if _preview_item.get_parent() != _placed_items_root:
+		_preview_item.reparent(_placed_items_root, true)
+	_preview_item.set_preview_mode(false)
+	_apply_cutaway_to_placeable(_preview_item)
+
+func _commit_edit_preview_item() -> void:
+	if _preview_item == null:
+		return
+
+	_ensure_placeable_metadata(_preview_item, _active_item_id)
+	_preview_item.set_meta("placement_surface", _active_surface_name)
+	_preview_item.set_preview_mode(false)
+	_apply_cutaway_to_placeable(_preview_item)
+
+func _restore_or_discard_active_preview(refund_stock: bool) -> void:
+	if _preview_item == null:
+		return
+
+	match _placement_session:
+		PLACEMENT_SESSION_EDIT:
+			_preview_item.global_transform = _editing_original_transform
+			_preview_item.set_preview_mode(false)
+			_apply_cutaway_to_placeable(_preview_item)
+		PLACEMENT_SESSION_NEW, PLACEMENT_SESSION_DUPLICATE:
+			if refund_stock and not _active_item_id.is_empty():
+				_item_stock[_active_item_id] = int(_item_stock.get(_active_item_id, 0)) + 1
+			_preview_item.queue_free()
+
+func _clear_active_session() -> void:
+	_preview_item = null
 	_placement_active = false
 	_placement_valid = false
 	_placement_issue_code = ""
 	_placement_issue_text = ""
 	_hover_target = ""
 	_drag_mode = ""
+	_active_item_id = ""
+	_active_surface_name = RoomConstants.FLOOR_SURFACE
+	_placement_session = PLACEMENT_SESSION_NONE
+	_editing_original_transform = Transform3D.IDENTITY
+	_popup_visual_signature = ""
 	_popup_panel.visible = false
 	_gizmo_root.visible = false
+	_sync_room_wall_openings()
+	_update_mode_ui()
 	_update_inventory_ui()
 	_update_status_text()
 	_update_grid_visibility()
 
-func _update_preview_from_mouse(use_current_mouse: bool) -> void:
-	if _preview_chair == null or _room_shell == null:
+func _find_duplicate_seed_position(base_position: Vector3) -> Vector3:
+	if _active_preview_is_wall_placeable():
+		return _find_wall_duplicate_seed_position(base_position)
+
+	var candidate_offsets: Array[Vector3] = [
+		Vector3(GRID_SIZE, 0.0, 0.0),
+		Vector3(-GRID_SIZE, 0.0, 0.0),
+		Vector3(0.0, 0.0, GRID_SIZE),
+		Vector3(0.0, 0.0, -GRID_SIZE),
+		Vector3(GRID_SIZE, 0.0, GRID_SIZE),
+		Vector3(GRID_SIZE, 0.0, -GRID_SIZE),
+		Vector3(-GRID_SIZE, 0.0, GRID_SIZE),
+		Vector3(-GRID_SIZE, 0.0, -GRID_SIZE),
+		Vector3(GRID_SIZE * 2.0, 0.0, 0.0),
+		Vector3(-GRID_SIZE * 2.0, 0.0, 0.0),
+		Vector3(0.0, 0.0, GRID_SIZE * 2.0),
+		Vector3(0.0, 0.0, -GRID_SIZE * 2.0),
+	]
+
+	for offset in candidate_offsets:
+		var candidate := base_position + offset
+		_preview_item.global_position = _snap_position_to_grid(candidate)
+		_refresh_preview_validity()
+		if _placement_valid:
+			return _preview_item.global_position
+
+	return _snap_position_to_grid(base_position)
+
+func _find_wall_duplicate_seed_position(base_position: Vector3) -> Vector3:
+	var candidate_offsets: Array[Vector2] = [
+		Vector2(GRID_SIZE, 0.0),
+		Vector2(-GRID_SIZE, 0.0),
+		Vector2(0.0, GRID_SIZE),
+		Vector2(0.0, -GRID_SIZE),
+		Vector2(GRID_SIZE * 2.0, 0.0),
+		Vector2(-GRID_SIZE * 2.0, 0.0),
+		Vector2(0.0, GRID_SIZE * 2.0),
+		Vector2(0.0, -GRID_SIZE * 2.0),
+	]
+
+	for offset in candidate_offsets:
+		var candidate := base_position
+		if _active_surface_name == RoomConstants.WALL_BACK or _active_surface_name == RoomConstants.WALL_FRONT:
+			candidate.x += offset.x
+			candidate.y += offset.y
+		else:
+			candidate.z += offset.x
+			candidate.y += offset.y
+
+		_preview_item.global_position = _snap_wall_position(candidate)
+		_refresh_preview_validity()
+		if _placement_valid:
+			return _preview_item.global_position
+
+	return _snap_wall_position(base_position)
+
+func _on_inventory_item_button_pressed(item_id: String) -> void:
+	var item_def: Dictionary = _get_item_definition(item_id)
+	if _placement_active or _is_edit_mode() or item_def.is_empty():
+		return
+	_start_inventory_placement(item_id)
+
+func _on_mode_button_pressed(mode_id: String) -> void:
+	if _placement_active or mode_id == _editor_mode:
 		return
 
-	var target_position: Vector3 = _preview_chair.global_position
+	_editor_mode = mode_id
+	_update_mode_ui()
+	_update_inventory_ui()
+	_update_status_text()
+	_update_grid_visibility()
+
+func _on_grid_toggle_button_pressed() -> void:
+	if _is_edit_mode():
+		return
+	_manual_grid_visible = not _manual_grid_visible
+	_update_grid_visibility()
+	_update_inventory_ui()
+
+func _on_floor_style_button_pressed(style_id: int) -> void:
+	if _room_shell == null:
+		return
+
+	if _room_shell.has_method("set_floor_style"):
+		_room_shell.call("set_floor_style", style_id)
+	_update_floor_style_ui()
+	_autosave_room_layout()
+
+func _on_save_button_pressed() -> void:
+	_save_room_layout()
+
+func _on_load_button_pressed() -> void:
+	_load_room_layout()
+
+func _on_clear_room_button_pressed() -> void:
+	_clear_room(true)
+
+func _on_confirm_button_pressed() -> void:
+	if not _placement_active or not _placement_valid or _preview_item == null:
+		return
+
+	match _placement_session:
+		PLACEMENT_SESSION_EDIT:
+			_commit_edit_preview_item()
+		PLACEMENT_SESSION_NEW, PLACEMENT_SESSION_DUPLICATE:
+			_commit_new_preview_item()
+		_:
+			return
+
+	_sync_room_wall_openings()
+	_clear_active_session()
+	_autosave_room_layout()
+	_notify_room_layout_visuals_changed()
+
+func _on_cancel_button_pressed() -> void:
+	_cancel_current_placement()
+
+func _on_duplicate_button_pressed() -> void:
+	if not _is_edit_session() or _preview_item == null or not _placement_valid:
+		return
+
+	var current_stock: int = int(_item_stock.get(_active_item_id, 0))
+	if current_stock <= 0:
+		return
+
+	var duplicate_preview := _create_item_instance(_active_item_id)
+	if duplicate_preview == null:
+		return
+
+	var seed_transform := _preview_item.global_transform
+	var seed_rotation := _preview_item.rotation.y
+	var original_surface_name := _active_surface_name
+	_commit_edit_preview_item()
+	_item_stock[_active_item_id] = current_stock - 1
+	add_child(duplicate_preview)
+	_activate_preview_session(duplicate_preview, _active_item_id, PLACEMENT_SESSION_DUPLICATE, true)
+	_active_surface_name = original_surface_name
+	_sync_room_wall_openings()
+	_preview_item.rotation.y = seed_rotation
+	_preview_item.global_position = _find_duplicate_seed_position(seed_transform.origin)
+	_refresh_preview_validity()
+
+func _on_delete_button_pressed() -> void:
+	if not _is_edit_session() or _preview_item == null:
+		return
+
+	if not _active_item_id.is_empty():
+		_item_stock[_active_item_id] = int(_item_stock.get(_active_item_id, 0)) + 1
+	_preview_item.free()
+	_sync_room_wall_openings()
+	_clear_active_session()
+	_autosave_room_layout()
+	_notify_room_layout_visuals_changed()
+
+func _cancel_current_placement() -> void:
+	if not _placement_active:
+		return
+
+	_restore_or_discard_active_preview(true)
+	_clear_active_session()
+
+func _update_preview_from_mouse(use_current_mouse: bool) -> void:
+	if _preview_item == null or _room_shell == null:
+		return
+
+	var target_position: Vector3 = _preview_item.global_position
 	if use_current_mouse:
-		var hit := _try_get_floor_hit(get_viewport().get_mouse_position())
+		var hit := _try_get_active_surface_hit(get_viewport().get_mouse_position())
 		if hit.get("valid", false):
+			_active_surface_name = String(hit.get("surface_name", _active_surface_name))
 			target_position = hit["position"] as Vector3
 
 	_set_preview_position(target_position)
 
 func _rotate_preview(direction: int) -> void:
-	if _preview_chair == null:
+	if _preview_item == null or not _preview_item.supports_rotation():
 		return
 
-	_preview_chair.rotate_y(deg_to_rad(90.0 * float(direction)))
+	_preview_item.rotate_y(deg_to_rad(90.0 * float(direction)))
 	_refresh_preview_validity()
 
 func _evaluate_preview_transform() -> Dictionary:
-	if _preview_chair == null or _room_shell == null:
-		return {"valid": false, "code": "missing", "reason": "Placement unavailable"}
-
-	var room_origin: Vector3 = _room_shell.global_position
-	var room_half_extents := _room_shell.get_inner_half_extents()
-	var footprint := _preview_chair.get_footprint_half_extents()
-	var local_x: float = _preview_chair.global_position.x - room_origin.x
-	var local_z: float = _preview_chair.global_position.z - room_origin.z
-
-	if absf(local_x) + footprint.x > room_half_extents.x:
-		return {"valid": false, "code": "bounds", "reason": "Too close to edge"}
-	if absf(local_z) + footprint.y > room_half_extents.y:
-		return {"valid": false, "code": "bounds", "reason": "Too close to edge"}
-
-	var space_state := get_world_3d().direct_space_state
-	var query := PhysicsShapeQueryParameters3D.new()
-	query.shape = _placement_query_shape
-	query.collision_mask = SimpleWoodChair.COLLISION_LAYER
-	query.transform = Transform3D(
-		Basis.IDENTITY.rotated(Vector3.UP, _preview_chair.rotation.y),
-		_preview_chair.global_position + _preview_chair.get_collision_center_offset()
+	return PlacementValidator.evaluate_preview_transform(
+		get_world_3d(),
+		_room_shell,
+		_preview_item,
+		_active_surface_name,
+		_placement_query_shape
 	)
 
-	if not space_state.intersect_shape(query, 4).is_empty():
-		return {"valid": false, "code": "occupied", "reason": "Space occupied"}
-
-	return {"valid": true, "code": "valid", "reason": "Ready to place"}
-
 func _refresh_preview_validity() -> void:
-	if _preview_chair == null:
+	if _preview_item == null:
 		return
 
 	var evaluation := _evaluate_preview_transform()
 	_placement_valid = evaluation.get("valid", false)
 	_placement_issue_code = String(evaluation.get("code", ""))
 	_placement_issue_text = String(evaluation.get("reason", ""))
-	_preview_chair.set_preview_valid(_placement_valid)
-	_preview_chair.set_hovered(_hover_target == "move" or _drag_mode == "move")
+	_preview_item.set_preview_valid(_placement_valid)
+	_preview_item.set_hovered(_hover_target == "move" or _drag_mode == "move")
 	_confirm_button.disabled = not _placement_valid
 	_popup_panel.visible = true
-	_gizmo_root.visible = true
+	_gizmo_root.visible = not _active_preview_is_wall_placeable()
 	_update_popup_visuals()
 	_update_status_text()
 
 func _update_inventory_ui() -> void:
-	var grid_visible := _manual_grid_visible or _placement_active
-	_chair_button.disabled = _chair_stock <= 0 or _placement_active
-	_stock_label.text = "Stock: %d / %d" % [_chair_stock, CHAIR_INITIAL_STOCK]
-	_grid_toggle_button.text = "Grid Overlay: %s" % ("On" if grid_visible else "Off")
+	var grid_visible := _manual_grid_visible or _placement_active or _is_edit_mode()
+	for item_def in _inventory_item_defs:
+		var item_id: String = String(item_def.get("id", ""))
+		var current_stock: int = int(_item_stock.get(item_id, 0))
+		var initial_stock: int = int(item_def.get("initial_stock", 0))
+		var button := _inventory_buttons.get(item_id) as Button
+		var stock_label := _inventory_stock_labels.get(item_id) as Label
+		if button != null:
+			button.disabled = current_stock <= 0 or _placement_active or _is_edit_mode()
+		if stock_label != null:
+			stock_label.text = "%d/%d" % [current_stock, initial_stock]
+	if _grid_toggle_button != null:
+		if _is_edit_mode():
+			_grid_toggle_button.text = "Grid Overlay: On (Edit Mode)"
+			_grid_toggle_button.disabled = true
+		else:
+			_grid_toggle_button.text = "Grid Overlay: %s" % ("On" if grid_visible else "Off")
+			_grid_toggle_button.disabled = false
+	if _save_button != null:
+		_save_button.disabled = _placement_active
+	if _load_button != null:
+		_load_button.disabled = _placement_active
+	if _clear_room_button != null:
+		_clear_room_button.disabled = _placement_active
+
+func _update_mode_ui() -> void:
+	for mode_id in _mode_buttons.keys():
+		var button := _mode_buttons.get(mode_id) as Button
+		if button == null:
+			continue
+
+		var is_selected := String(mode_id) == _editor_mode
+		button.button_pressed = is_selected
+		button.disabled = is_selected or _placement_active
+
+	if _mode_label != null:
+		_mode_label.text = "Mode: %s" % ("Edit" if _is_edit_mode() else "Build")
+
+func _update_floor_style_ui() -> void:
+	var current_style := FLOOR_STYLE_COZY_BROWN
+	if _room_shell != null and _room_shell.has_method("get_floor_style"):
+		current_style = int(_room_shell.call("get_floor_style"))
+
+	for style_id in _floor_style_buttons.keys():
+		var button := _floor_style_buttons.get(style_id) as Button
+		if button == null:
+			continue
+
+		var is_selected := int(style_id) == current_style
+		button.button_pressed = is_selected
+		button.disabled = is_selected
+
+	if _floor_style_label != null:
+		_floor_style_label.text = "Floor Finish: %s" % ("Brown Mat" if current_style == FLOOR_STYLE_COZY_BROWN else "Checkerboard")
 
 func _update_status_text() -> void:
+	if _status_label == null:
+		return
+
 	if _placement_active:
 		if _placement_valid:
-			_status_label.text = "Ready to place %s.\nLeft-drag the chair, use the gizmo handles, or click a floor cell. Q/E still rotates." % SimpleWoodChair.DISPLAY_NAME
+			match _placement_session:
+				PLACEMENT_SESSION_EDIT:
+					if _active_preview_is_wall_placeable():
+						_status_label.text = "Editing %s on the wall.\nDrag across the wall to move it. Duplicate and Delete are available while editing." % _get_active_item_display_name()
+					else:
+						_status_label.text = "Editing %s.\nDrag, use the gizmo, or click another cell. Duplicate and Delete are available while editing." % _get_active_item_display_name()
+				PLACEMENT_SESSION_DUPLICATE:
+					if _active_preview_is_wall_placeable():
+						_status_label.text = "Ready to place a duplicate of %s.\nMove it to a new wall cell, then confirm to keep both copies." % _get_active_item_display_name()
+					else:
+						_status_label.text = "Ready to place a duplicate of %s.\nMove it to a new cell, then confirm to keep both copies." % _get_active_item_display_name()
+				_:
+					if _active_preview_is_wall_placeable():
+						_status_label.text = "Ready to place %s.\nClick or drag on a visible wall cell. This item cuts a window opening into the wall." % _get_active_item_display_name()
+					else:
+						_status_label.text = "Ready to place %s.\nLeft-drag the item, use the gizmo handles, or click a floor cell. Q/E still rotates." % _get_active_item_display_name()
 		else:
 			match _placement_issue_code:
 				"bounds":
-					_status_label.text = "Blocked by the room edge.\nKeep the chair fully inside the floor before placing."
+					if _active_preview_is_wall_placeable():
+						_status_label.text = "Blocked by the wall edge.\nKeep %s fully inside the visible wall area before placing." % _get_active_item_display_name()
+					else:
+						_status_label.text = "Blocked by the room edge.\nKeep %s fully inside the floor before placing." % _get_active_item_display_name()
+				"surface":
+					_status_label.text = "Point at a visible wall.\nThis item can only be placed on an enabled wall surface."
 				"occupied":
-					_status_label.text = "Blocked by another chair.\nMove to a clear cell, or press X / Esc to cancel."
+					_status_label.text = "Blocked by another placed item.\nMove to a clear cell, or press X / Esc to cancel."
 				_:
-					_status_label.text = "Blocked placement.\nMove away from walls or another chair, or press X / Esc to cancel."
+					_status_label.text = "Blocked placement.\nMove away from walls or another item, or press X / Esc to cancel."
 		return
 
-	if _chair_stock <= 0:
-		_status_label.text = "All chairs are deployed.\nUse the grid toggle if you still want to inspect spacing."
+	if _is_edit_mode():
+		_status_label.text = "Edit mode is active.\nDouble-click any placed furniture to move it. The grid stays on automatically while editing."
 		return
 
-	_status_label.text = "Click %s to start placement.\nThe dotted grid will turn on automatically while placing." % SimpleWoodChair.DISPLAY_NAME
+	if not _has_any_stock():
+		_status_label.text = "All inventory items are deployed.\nUse the grid toggle if you still want to inspect spacing."
+		return
+
+	_status_label.text = "Choose an item to start placement.\nThe dotted grid will turn on automatically while placing."
 
 func _update_grid_visibility() -> void:
 	if _grid_overlay == null:
 		return
 
 	_refresh_grid_overlay_transform()
-	_grid_overlay.visible = _manual_grid_visible or _placement_active
+	_grid_overlay.visible = _manual_grid_visible or _placement_active or _is_edit_mode()
 
 func _refresh_grid_overlay_transform() -> void:
 	if _grid_overlay == null or _room_shell == null:
@@ -463,14 +1264,16 @@ func _refresh_grid_overlay_transform() -> void:
 	_grid_overlay.global_position = _room_shell.global_position + Vector3(0.0, 0.03, 0.0)
 
 func _update_popup_position() -> void:
-	if _preview_chair == null:
+	if _preview_item == null:
 		return
 
 	var camera := _get_active_camera()
 	if camera == null:
 		return
 
-	var anchor_world: Vector3 = _preview_chair.global_position + Vector3(0.0, 2.22, 0.0)
+	var anchor_height: float = _preview_item.get_collision_size().y * (0.5 if _active_preview_is_wall_placeable() else 1.0)
+	anchor_height += 0.38 if _active_preview_is_wall_placeable() else 0.72
+	var anchor_world: Vector3 = _preview_item.global_position + Vector3(0.0, anchor_height, 0.0)
 	if camera.is_position_behind(anchor_world):
 		_popup_panel.visible = false
 		return
@@ -485,11 +1288,12 @@ func _update_popup_position() -> void:
 	_popup_panel.position = screen_position
 
 func _update_gizmo_transform() -> void:
-	if _preview_chair == null:
+	if _preview_item == null:
 		return
 
-	_gizmo_root.global_position = _preview_chair.global_position + Vector3(0.0, 0.88, 0.0)
-	_gizmo_root.rotation.y = _preview_chair.rotation.y
+	var gizmo_height: float = clampf(_preview_item.get_collision_size().y * 0.5 + 0.12, 0.88, 1.24)
+	_gizmo_root.global_position = _preview_item.global_position + Vector3(0.0, gizmo_height, 0.0)
+	_gizmo_root.rotation.y = _preview_item.rotation.y
 	var camera := _get_active_camera()
 	if camera != null:
 		var camera_distance: float = camera.global_position.distance_to(_gizmo_root.global_position)
@@ -509,47 +1313,47 @@ func _get_overlay_size() -> Vector2:
 	var extents := _room_shell.get_inner_half_extents()
 	return extents * 2.0
 
-func _get_grid_min_corner() -> Vector2:
-	if _room_shell == null:
-		return Vector2(-6.0, -6.0)
-
-	var extents: Vector2 = _room_shell.get_inner_half_extents()
-	return Vector2(
-		_room_shell.global_position.x - extents.x,
-		_room_shell.global_position.z - extents.y
-	)
-
 func _is_pointer_over_placement_ui() -> bool:
 	var hovered := get_viewport().gui_get_hovered_control()
-	while hovered != null:
-		if hovered == _inventory_panel or hovered == _popup_panel:
-			return true
-		hovered = hovered.get_parent() as Control
-
-	return false
+	return hovered != null
 
 func _pick_interaction_target(mouse_position: Vector2) -> String:
-	if _preview_chair == null or _is_pointer_over_placement_ui():
+	if _preview_item == null or _is_pointer_over_placement_ui():
 		return ""
 
-	var gizmo_hit := _raycast_from_mouse(mouse_position, GIZMO_COLLISION_LAYER)
-	if not gizmo_hit.is_empty():
-		var gizmo_collider := gizmo_hit.get("collider") as CollisionObject3D
-		if gizmo_collider != null and gizmo_collider.has_meta("handle_id"):
-			return String(gizmo_collider.get_meta("handle_id"))
+	if not _active_preview_is_wall_placeable():
+		var gizmo_hit := _raycast_from_mouse(mouse_position, GIZMO_COLLISION_LAYER)
+		if not gizmo_hit.is_empty():
+			var gizmo_collider := gizmo_hit.get("collider") as CollisionObject3D
+			if gizmo_collider != null and gizmo_collider.has_meta("handle_id"):
+				return String(gizmo_collider.get_meta("handle_id"))
 
 	var preview_hit := _raycast_from_mouse(mouse_position, SimpleWoodChair.PREVIEW_PICK_LAYER)
 	if not preview_hit.is_empty():
 		return "move"
+	if _try_get_active_surface_hit(mouse_position).get("valid", false):
+		return "surface" if _active_preview_is_wall_placeable() else "floor"
+	if _active_preview_is_wall_placeable() and _try_get_wall_plane_hit(mouse_position, _active_surface_name).get("valid", false):
+		return "surface"
 	if _try_get_floor_hit(mouse_position).get("valid", false):
 		return "floor"
 
 	return ""
 
+func _pick_placeable_item(mouse_position: Vector2) -> SimpleWoodChair:
+	if _is_pointer_over_placement_ui():
+		return null
+
+	var hit := _raycast_from_mouse(mouse_position, SimpleWoodChair.COLLISION_LAYER)
+	if hit.is_empty():
+		return null
+
+	return hit.get("collider") as SimpleWoodChair
+
 func _begin_drag(mode: String, mouse_position: Vector2) -> void:
 	_drag_mode = mode
-	_drag_start_position = _preview_chair.global_position
-	_drag_start_rotation_y = _preview_chair.rotation.y
+	_drag_start_position = _preview_item.global_position
+	_drag_start_rotation_y = _preview_item.rotation.y
 	_drag_rotation_start_angle = _get_floor_angle_around_preview(mouse_position)
 	_hover_target = mode
 	_update_gizmo_hover_state()
@@ -557,22 +1361,29 @@ func _begin_drag(mode: String, mouse_position: Vector2) -> void:
 func _update_drag(mouse_position: Vector2) -> void:
 	match _drag_mode:
 		"move":
-			var free_hit := _try_get_floor_hit(mouse_position)
+			var free_hit := _try_get_active_surface_hit(mouse_position)
 			if free_hit.get("valid", false):
+				_active_surface_name = String(free_hit.get("surface_name", _active_surface_name))
 				_set_preview_position(free_hit["position"] as Vector3)
 		"axis_x":
+			if _active_preview_is_wall_placeable():
+				return
 			var x_hit := _try_get_floor_hit(mouse_position)
 			if x_hit.get("valid", false):
 				_set_preview_position(_project_point_onto_drag_axis(x_hit["position"] as Vector3, "axis_x"))
 		"axis_z":
+			if _active_preview_is_wall_placeable():
+				return
 			var z_hit := _try_get_floor_hit(mouse_position)
 			if z_hit.get("valid", false):
 				_set_preview_position(_project_point_onto_drag_axis(z_hit["position"] as Vector3, "axis_z"))
 		"rotate":
+			if _active_preview_is_wall_placeable():
+				return
 			var current_angle := _get_floor_angle_around_preview(mouse_position)
 			var delta_angle := wrapf(current_angle - _drag_rotation_start_angle, -PI, PI)
 			var rotation_steps: float = round(delta_angle / ROTATION_SNAP_STEP)
-			_preview_chair.rotation.y = _drag_start_rotation_y + rotation_steps * ROTATION_SNAP_STEP
+			_preview_item.rotation.y = _drag_start_rotation_y + rotation_steps * ROTATION_SNAP_STEP
 			_refresh_preview_validity()
 
 func _end_drag() -> void:
@@ -581,7 +1392,12 @@ func _end_drag() -> void:
 	_update_gizmo_hover_state()
 
 func _set_preview_position(target_position: Vector3) -> void:
-	_preview_chair.global_position = _snap_position_to_grid(target_position)
+	if _active_preview_is_wall_placeable():
+		_preview_item.global_position = _snap_wall_position(target_position)
+		_preview_item.rotation.y = RoomConstants.get_wall_rotation(_active_surface_name) + _preview_item.get_wall_rotation_offset()
+		_sync_room_wall_openings()
+	else:
+		_preview_item.global_position = _snap_position_to_grid(target_position)
 	_refresh_preview_validity()
 
 func _project_point_onto_drag_axis(target_position: Vector3, axis_mode: String) -> Vector3:
@@ -600,7 +1416,7 @@ func _project_point_onto_drag_axis(target_position: Vector3, axis_mode: String) 
 	return constrained_position
 
 func _get_drag_axis_direction(axis_mode: String) -> Vector3:
-	if _preview_chair == null:
+	if _preview_item == null:
 		return Vector3.ZERO
 
 	var axis_basis := Basis(Vector3.UP, _drag_start_rotation_y)
@@ -611,63 +1427,48 @@ func _get_drag_axis_direction(axis_mode: String) -> Vector3:
 	return axis_direction.normalized()
 
 func _snap_position_to_grid(target_position: Vector3) -> Vector3:
-	var grid_min: Vector2 = _get_grid_min_corner()
-	var room_extents: Vector2 = _room_shell.get_inner_half_extents()
-	var cell_count_x: int = maxi(1, int(round(room_extents.x * 2.0 / GRID_SIZE)))
-	var cell_count_z: int = maxi(1, int(round(room_extents.y * 2.0 / GRID_SIZE)))
-	var snapped_cell_x: int = clampi(int(floor((target_position.x - grid_min.x) / GRID_SIZE)), 0, cell_count_x - 1)
-	var snapped_cell_z: int = clampi(int(floor((target_position.z - grid_min.y) / GRID_SIZE)), 0, cell_count_z - 1)
-	return Vector3(
-		grid_min.x + (float(snapped_cell_x) + 0.5) * GRID_SIZE,
-		_room_shell.get_floor_y(),
-		grid_min.y + (float(snapped_cell_z) + 0.5) * GRID_SIZE
-	)
+	return PlacementSurfaceQueries.snap_position_to_grid(_room_shell, target_position, GRID_SIZE)
+
+func _snap_wall_position(target_position: Vector3) -> Vector3:
+	return PlacementSurfaceQueries.snap_wall_position(_room_shell, _active_surface_name, target_position, _get_wall_snap_size())
+
+func _try_get_active_surface_hit(mouse_position: Vector2) -> Dictionary:
+	if _preview_item == null:
+		return {"valid": false}
+	if _active_preview_is_wall_placeable():
+		var wall_hit := _try_get_best_supported_wall_hit(mouse_position)
+		if wall_hit.get("valid", false):
+			_active_surface_name = String(wall_hit.get("surface_name", _active_surface_name))
+		return wall_hit
+
+	var floor_hit := _try_get_floor_hit(mouse_position)
+	if floor_hit.get("valid", false):
+		floor_hit["surface_name"] = RoomConstants.FLOOR_SURFACE
+	return floor_hit
+
+func _get_wall_snap_size() -> float:
+	return PlacementSurfaceQueries.get_wall_snap_size(_preview_item, GRID_SIZE, WALL_SNAP_SIZE)
+
+func _try_get_best_supported_wall_hit(mouse_position: Vector2) -> Dictionary:
+	var camera := _get_active_camera()
+	return PlacementSurfaceQueries.try_get_best_supported_wall_hit(camera, _room_shell, _preview_item, mouse_position)
+
+func _try_get_wall_plane_hit(mouse_position: Vector2, surface_name: String) -> Dictionary:
+	var camera := _get_active_camera()
+	return PlacementSurfaceQueries.try_get_wall_plane_hit(camera, _room_shell, mouse_position, surface_name)
 
 func _try_get_floor_hit(mouse_position: Vector2) -> Dictionary:
 	var camera := _get_active_camera()
-	if camera == null or _room_shell == null:
-		return {"valid": false}
-
-	var ray_origin: Vector3 = camera.project_ray_origin(mouse_position)
-	var ray_normal: Vector3 = camera.project_ray_normal(mouse_position)
-	var floor_y := _room_shell.get_floor_y()
-	if absf(ray_normal.y) <= 0.0001:
-		return {"valid": false}
-
-	var hit_distance: float = (floor_y - ray_origin.y) / ray_normal.y
-	if hit_distance <= 0.0:
-		return {"valid": false}
-
-	return {
-		"valid": true,
-		"position": ray_origin + ray_normal * hit_distance,
-	}
+	return PlacementSurfaceQueries.try_get_floor_hit(camera, _room_shell, mouse_position)
 
 func _raycast_from_mouse(mouse_position: Vector2, collision_mask: int) -> Dictionary:
 	var camera := _get_active_camera()
-	if camera == null:
-		return {}
-
-	var ray_origin: Vector3 = camera.project_ray_origin(mouse_position)
-	var ray_normal: Vector3 = camera.project_ray_normal(mouse_position)
-	var ray_query := PhysicsRayQueryParameters3D.create(ray_origin, ray_origin + ray_normal * 128.0, collision_mask)
-	ray_query.collide_with_areas = false
-	ray_query.collide_with_bodies = true
-	return get_world_3d().direct_space_state.intersect_ray(ray_query)
+	var space_state := get_world_3d().direct_space_state
+	return PlacementSurfaceQueries.raycast_from_mouse(space_state, camera, mouse_position, collision_mask)
 
 func _get_floor_angle_around_preview(mouse_position: Vector2) -> float:
-	var hit := _try_get_floor_hit(mouse_position)
-	if not hit.get("valid", false):
-		return 0.0
-
-	var hit_position := hit["position"] as Vector3
-	var flat_offset := Vector2(
-		hit_position.x - _preview_chair.global_position.x,
-		hit_position.z - _preview_chair.global_position.z
-	)
-	if flat_offset.length_squared() <= 0.0001:
-		return 0.0
-	return flat_offset.angle()
+	var camera := _get_active_camera()
+	return PlacementSurfaceQueries.get_floor_angle_around_preview(camera, _room_shell, _preview_item, mouse_position)
 
 func _update_gizmo_hover_state() -> void:
 	for handle_id in _gizmo_handle_materials.keys():
@@ -689,175 +1490,100 @@ func _update_popup_visuals() -> void:
 	if _popup_panel == null or _confirm_button == null or _cancel_button == null:
 		return
 
+	var duplicate_enabled := _is_edit_session() and _placement_valid and int(_item_stock.get(_active_item_id, 0)) > 0
+	var delete_enabled := _is_edit_session()
 	var panel_bg: Color
 	var panel_border: Color
 	var status_color: Color
+	var popup_status_text := "Ready"
+	var popup_hint_text := "LMB drag  |  Q/E rotate"
 	if _placement_valid:
 		panel_bg = Color(0.08, 0.12, 0.1, 0.92)
 		panel_border = Color(0.38, 0.92, 0.58, 0.96)
 		status_color = Color(0.9, 1.0, 0.92, 1.0)
-		if _popup_status_label != null:
-			_popup_status_label.text = "Ready"
-		if _popup_hint_label != null:
-			_popup_hint_label.text = "LMB drag  |  Q/E rotate"
 	else:
 		panel_bg = Color(0.15, 0.09, 0.09, 0.94)
 		panel_border = Color(0.98, 0.34, 0.34, 0.98)
 		status_color = Color(1.0, 0.92, 0.92, 1.0)
-		if _popup_status_label != null:
-			_popup_status_label.text = _placement_issue_text
-		if _popup_hint_label != null:
-			_popup_hint_label.text = "Move to a clear cell"
+		popup_status_text = _placement_issue_text
+		popup_hint_text = "Move to a clear cell"
 
-	_popup_panel.add_theme_stylebox_override("panel", _make_panel_style(panel_bg, panel_border))
+	var confirm_text := "Move" if _is_edit_session() else "Place"
+	var confirm_tooltip := "Confirm the current %s" % ("move" if _is_edit_session() else "placement")
+	var cancel_tooltip := "Cancel the current action"
+
+	if _placement_valid:
+		if _active_preview_is_wall_placeable():
+			popup_hint_text = "Drag on wall  |  Double-click to edit" if not _is_edit_session() else "Drag on wall  |  Duplicate/Delete"
+		else:
+			popup_hint_text = "LMB drag  |  Q/E rotate" if not _is_edit_session() else "LMB drag  |  Q/E rotate  |  Duplicate/Delete"
+
+	var popup_visual_signature := JSON.stringify({
+		"valid": _placement_valid,
+		"status": popup_status_text,
+		"hint": popup_hint_text,
+		"confirm": confirm_text,
+		"edit": _is_edit_session(),
+		"duplicate_enabled": duplicate_enabled,
+		"delete_enabled": delete_enabled,
+		"wall": _active_preview_is_wall_placeable(),
+	})
+	if popup_visual_signature == _popup_visual_signature:
+		return
+
+	_popup_visual_signature = popup_visual_signature
+	_popup_panel.add_theme_stylebox_override("panel", PlacementUiStyles.make_panel_style(panel_bg, panel_border))
 	if _popup_status_label != null:
+		_popup_status_label.text = popup_status_text
 		_popup_status_label.add_theme_color_override("font_color", status_color)
 	if _popup_hint_label != null:
+		_popup_hint_label.text = popup_hint_text
 		_popup_hint_label.add_theme_color_override("font_color", Color(0.88, 0.9, 0.95, 0.84))
+	if _confirm_button != null:
+		_confirm_button.text = confirm_text
+		_confirm_button.tooltip_text = confirm_tooltip
+	if _cancel_button != null:
+		_cancel_button.text = "Cancel"
+		_cancel_button.tooltip_text = cancel_tooltip
+	if _popup_edit_row != null:
+		_popup_edit_row.visible = _is_edit_session()
+	if _duplicate_button != null:
+		_duplicate_button.disabled = not duplicate_enabled
+		_duplicate_button.tooltip_text = "Create a second copy if stock remains"
+	if _delete_button != null:
+		_delete_button.disabled = not delete_enabled
+		_delete_button.tooltip_text = "Delete this placed item and return its stock"
 
-	_apply_button_style(
+	PlacementUiStyles.apply_button_style(
 		_confirm_button,
 		Color(0.22, 0.58, 0.33, 0.98),
 		Color(0.42, 0.98, 0.62, 0.98),
 		Color(0.96, 1.0, 0.97, 1.0)
 	)
-	_apply_button_style(
+	PlacementUiStyles.apply_button_style(
 		_cancel_button,
 		Color(0.24, 0.26, 0.31, 0.98),
 		Color(0.54, 0.58, 0.68, 0.98),
 		Color(0.97, 0.98, 1.0, 1.0)
 	)
+	PlacementUiStyles.apply_button_style(
+		_duplicate_button,
+		Color(0.24, 0.39, 0.62, 0.98),
+		Color(0.48, 0.74, 1.0, 0.98),
+		Color(0.96, 0.98, 1.0, 1.0)
+	)
+	PlacementUiStyles.apply_button_style(
+		_delete_button,
+		Color(0.55, 0.16, 0.16, 0.98),
+		Color(0.96, 0.42, 0.42, 0.98),
+		Color(1.0, 0.96, 0.96, 1.0)
+	)
 
-func _apply_button_style(button: Button, bg_color: Color, border_color: Color, font_color: Color) -> void:
-	if button == null:
-		return
+func _build_wall_openings_signature(openings_by_surface: Dictionary) -> String:
+	var normalized: Array = []
+	for surface_name in RoomConstants.WALL_SURFACES:
+		normalized.append(openings_by_surface.get(surface_name, []))
+	return JSON.stringify(normalized)
 
-	button.add_theme_stylebox_override("normal", _make_panel_style(bg_color, border_color, 1, 8))
-	button.add_theme_stylebox_override("hover", _make_panel_style(bg_color.lerp(Color.WHITE, 0.12), border_color.lerp(Color.WHITE, 0.22), 1, 8))
-	button.add_theme_stylebox_override("pressed", _make_panel_style(bg_color.lerp(Color.BLACK, 0.18), border_color, 1, 8))
-	button.add_theme_stylebox_override("disabled", _make_panel_style(bg_color.lerp(Color.BLACK, 0.45), border_color.lerp(Color.BLACK, 0.55), 1, 8))
-	button.add_theme_stylebox_override("focus", _make_panel_style(bg_color, border_color, 1, 8))
-	button.add_theme_color_override("font_color", font_color)
-	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	button.add_theme_color_override("font_disabled_color", font_color.lerp(Color.BLACK, 0.45))
-
-func _make_panel_style(background_color: Color, border_color: Color, border_width: int = 2, corner_radius: int = 10) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background_color
-	style.border_color = border_color
-	style.border_width_left = border_width
-	style.border_width_top = border_width
-	style.border_width_right = border_width
-	style.border_width_bottom = border_width
-	style.corner_radius_top_left = corner_radius
-	style.corner_radius_top_right = corner_radius
-	style.corner_radius_bottom_left = corner_radius
-	style.corner_radius_bottom_right = corner_radius
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.18)
-	style.shadow_size = 6
-	return style
-
-func _make_arrow_gizmo(handle_id: String, axis: Vector3, color: Color) -> Node3D:
-	var root := Node3D.new()
-	root.name = handle_id
-
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.metallic = 0.0
-	material.roughness = 0.2
-	material.emission_enabled = true
-	material.emission = color * 0.18
-
-	_gizmo_handle_nodes[handle_id] = root
-	_gizmo_handle_materials[handle_id] = material
-	_gizmo_handle_base_colors[handle_id] = color
-
-	var stem := MeshInstance3D.new()
-	var stem_mesh := CylinderMesh.new()
-	stem_mesh.top_radius = 0.035
-	stem_mesh.bottom_radius = 0.035
-	stem_mesh.height = 0.72
-	stem.mesh = stem_mesh
-	stem.material_override = material
-	stem.position = Vector3(0.0, 0.36, 0.0)
-	root.add_child(stem)
-
-	var head := MeshInstance3D.new()
-	var head_mesh := CylinderMesh.new()
-	head_mesh.top_radius = 0.0
-	head_mesh.bottom_radius = 0.08
-	head_mesh.height = 0.2
-	head.mesh = head_mesh
-	head.material_override = material
-	head.position = Vector3(0.0, 0.82, 0.0)
-	root.add_child(head)
-
-	if axis == Vector3.RIGHT:
-		root.rotation_degrees = Vector3(0.0, 0.0, -90.0)
-	elif axis == Vector3.BACK:
-		root.rotation_degrees = Vector3(90.0, 0.0, 0.0)
-
-	root.add_child(_make_gizmo_pick_body(handle_id, Vector3(0.0, 0.44, 0.0), BoxShape3D.new(), Vector3(0.18, 0.9, 0.18)))
-	return root
-
-func _make_rotation_ring(handle_id: String) -> Node3D:
-	var ring_root := Node3D.new()
-	ring_root.name = handle_id
-	ring_root.position = Vector3(0.0, 0.05, 0.0)
-
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(1.0, 0.74, 0.24, 0.95)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.emission_enabled = true
-	material.emission = Color(1.0, 0.74, 0.24, 1.0) * 0.18
-
-	_gizmo_handle_nodes[handle_id] = ring_root
-	_gizmo_handle_materials[handle_id] = material
-	_gizmo_handle_base_colors[handle_id] = Color(1.0, 0.74, 0.24, 0.95)
-
-	var ring := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = GIZMO_RING_RADIUS - 0.03
-	torus.outer_radius = GIZMO_RING_RADIUS + 0.03
-	torus.rings = 28
-	torus.ring_segments = 12
-	ring.mesh = torus
-	ring.material_override = material
-	ring_root.add_child(ring)
-	_add_rotation_ring_pick_bodies(ring_root, handle_id)
-
-	return ring_root
-
-func _make_gizmo_pick_body(handle_id: String, local_position: Vector3, shape: Shape3D, shape_size: Vector3 = Vector3.ONE) -> StaticBody3D:
-	var body := StaticBody3D.new()
-	body.collision_layer = GIZMO_COLLISION_LAYER
-	body.collision_mask = 0
-	body.set_meta("handle_id", handle_id)
-	body.position = local_position
-
-	var collision_shape := CollisionShape3D.new()
-	if shape is BoxShape3D:
-		var box_shape := shape as BoxShape3D
-		box_shape.size = shape_size
-	elif shape is SphereShape3D:
-		var sphere_shape := shape as SphereShape3D
-		sphere_shape.radius = shape_size.x
-	collision_shape.shape = shape
-	body.add_child(collision_shape)
-
-	return body
-
-func _add_rotation_ring_pick_bodies(ring_root: Node3D, handle_id: String) -> void:
-	for segment_index in 12:
-		var angle := TAU * float(segment_index) / 12.0
-		var pick_body := _make_gizmo_pick_body(
-			handle_id,
-			Vector3(cos(angle) * GIZMO_RING_RADIUS, 0.0, sin(angle) * GIZMO_RING_RADIUS),
-			SphereShape3D.new(),
-			Vector3(0.11, 0.0, 0.0)
-		)
-		ring_root.add_child(pick_body)
+func _notify_room_layout_visuals_changed() -> void:
+	room_layout_visuals_changed.emit()

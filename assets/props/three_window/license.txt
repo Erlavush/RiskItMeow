@@ -1,0 +1,8 @@
+Model Information:
+* title:	window
+* source:	https://sketchfab.com/3d-models/window-2811eb28fa7a49b4adb86b948f75ff37
+* author:	x_d1off (https://sketchfab.com/x_d1off)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

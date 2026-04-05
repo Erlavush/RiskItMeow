@@ -1,6 +1,8 @@
+@tool
 class_name SimpleWoodChair
 extends StaticBody3D
 
+const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const DISPLAY_NAME := "Simple Wood Chair"
 const VISUAL_SCENE_PATH := "res://assets/props/simple_wood_chair/scene.gltf"
 const VISUAL_SCALE := Vector3.ONE * 0.25
@@ -17,6 +19,7 @@ const OUTLINE_PADDING := 0.08
 var _is_preview := false
 var _preview_is_valid := true
 var _is_hovered := false
+var _camera_cutaway := false
 var _visual_root: Node3D
 var _preview_material: StandardMaterial3D
 var _outline_mesh_instance: MeshInstance3D
@@ -27,21 +30,62 @@ var _mesh_instances: Array[MeshInstance3D] = []
 
 func _ready() -> void:
 	if name.is_empty() or name.begins_with("@"):
-		name = DISPLAY_NAME
+		name = get_display_name()
 
 	_ensure_collision_shape()
 	_ensure_visual()
 	_ensure_feedback_visuals()
 	_apply_mode()
 
+func get_display_name() -> String:
+	return DISPLAY_NAME
+
+func get_placement_surface_kind() -> String:
+	return RoomConstants.FLOOR_SURFACE
+
+func get_default_wall_surface() -> String:
+	return RoomConstants.WALL_BACK
+
+func get_supported_wall_surfaces() -> Array[String]:
+	return []
+
+func requires_wall_opening() -> bool:
+	return false
+
+func get_wall_half_extents() -> Vector2:
+	var collision_size := get_collision_size()
+	return Vector2(collision_size.x * 0.5, collision_size.y * 0.5)
+
+func get_wall_opening_half_extents() -> Vector2:
+	return Vector2.ZERO
+
+func supports_rotation() -> bool:
+	return true
+
+func get_wall_rotation_offset() -> float:
+	return 0.0
+
 func get_collision_size() -> Vector3:
 	return COLLISION_SIZE
 
 func get_collision_center_offset() -> Vector3:
-	return Vector3(0.0, COLLISION_SIZE.y * 0.5, 0.0)
+	return Vector3(0.0, get_collision_size().y * 0.5, 0.0)
 
 func get_footprint_half_extents() -> Vector2:
-	return Vector2(COLLISION_SIZE.x * 0.5, COLLISION_SIZE.z * 0.5)
+	var collision_size := get_collision_size()
+	return Vector2(collision_size.x * 0.5, collision_size.z * 0.5)
+
+func get_visual_scene_path() -> String:
+	return VISUAL_SCENE_PATH
+
+func get_visual_scale() -> Vector3:
+	return VISUAL_SCALE
+
+func get_visual_y_offset() -> float:
+	return VISUAL_Y_OFFSET
+
+func get_runtime_shadow_cast_setting() -> int:
+	return GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 func set_preview_mode(value: bool) -> void:
 	_is_preview = value
@@ -58,6 +102,11 @@ func set_hovered(value: bool) -> void:
 	if is_node_ready():
 		_apply_preview_color()
 
+func set_camera_cutaway(value: bool) -> void:
+	_camera_cutaway = value
+	if is_node_ready():
+		_apply_mode()
+
 func _ensure_collision_shape() -> void:
 	var collision_shape := get_node_or_null("CollisionShape3D") as CollisionShape3D
 	if collision_shape == null:
@@ -70,7 +119,7 @@ func _ensure_collision_shape() -> void:
 
 	var box_shape := collision_shape.shape as BoxShape3D
 	if box_shape != null:
-		box_shape.size = COLLISION_SIZE
+		box_shape.size = get_collision_size()
 
 	collision_shape.position = get_collision_center_offset()
 
@@ -82,12 +131,12 @@ func _ensure_visual() -> void:
 		add_child(_visual_root)
 
 	if _visual_root.get_child_count() == 0:
-		var visual_scene := load(VISUAL_SCENE_PATH) as PackedScene
+		var visual_scene := load(get_visual_scene_path()) as PackedScene
 		if visual_scene != null:
 			var imported_visual := visual_scene.instantiate()
 			imported_visual.name = "ImportedVisual"
-			imported_visual.scale = VISUAL_SCALE
-			imported_visual.position = Vector3(0.0, VISUAL_Y_OFFSET, 0.0)
+			imported_visual.scale = get_visual_scale()
+			imported_visual.position = Vector3(0.0, get_visual_y_offset(), 0.0)
 			_visual_root.add_child(imported_visual)
 		else:
 			_create_fallback_visual()
@@ -97,10 +146,11 @@ func _ensure_visual() -> void:
 
 func _ensure_feedback_visuals() -> void:
 	_outline_mesh_instance = get_node_or_null("PreviewOutline") as MeshInstance3D
+	var collision_size := get_collision_size()
 	if _outline_mesh_instance == null:
 		_outline_mesh_instance = MeshInstance3D.new()
 		_outline_mesh_instance.name = "PreviewOutline"
-		_outline_mesh_instance.mesh = _build_outline_mesh(COLLISION_SIZE + Vector3.ONE * OUTLINE_PADDING)
+		_outline_mesh_instance.mesh = _build_outline_mesh(collision_size + Vector3.ONE * OUTLINE_PADDING)
 		_outline_mesh_instance.position = get_collision_center_offset()
 		_outline_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_outline_mesh_instance)
@@ -111,9 +161,9 @@ func _ensure_feedback_visuals() -> void:
 		_footprint_marker.name = "FootprintMarker"
 		var footprint_mesh := BoxMesh.new()
 		footprint_mesh.size = Vector3(
-			COLLISION_SIZE.x + FOOTPRINT_PADDING,
+			collision_size.x + FOOTPRINT_PADDING,
 			FOOTPRINT_THICKNESS,
-			COLLISION_SIZE.z + FOOTPRINT_PADDING
+			collision_size.z + FOOTPRINT_PADDING
 		)
 		_footprint_marker.mesh = footprint_mesh
 		_footprint_marker.position = Vector3(0.0, FOOTPRINT_THICKNESS * 0.5, 0.0)
@@ -129,15 +179,28 @@ func _collect_mesh_instances(node: Node) -> void:
 		_collect_mesh_instances(child)
 
 func _apply_mode() -> void:
-	collision_layer = PREVIEW_PICK_LAYER if _is_preview else ((1 << 0) | COLLISION_LAYER)
+	if _is_preview:
+		collision_layer = PREVIEW_PICK_LAYER
+	elif _camera_cutaway and get_placement_surface_kind() == RoomConstants.SURFACE_DECOR:
+		collision_layer = 0
+	else:
+		collision_layer = (1 << 0) | COLLISION_LAYER
 	collision_mask = 0
 	_apply_preview_color()
 
 func _apply_preview_color() -> void:
+	if _visual_root != null:
+		_visual_root.visible = _is_preview or not _camera_cutaway
+
 	if not _is_preview:
+		var runtime_shadow_cast := get_runtime_shadow_cast_setting()
 		for mesh_instance in _mesh_instances:
-			mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			mesh_instance.visible = not _camera_cutaway
+			mesh_instance.cast_shadow = runtime_shadow_cast
+			if _camera_cutaway and runtime_shadow_cast != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+				mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 			mesh_instance.material_override = null
+			mesh_instance.material_overlay = null
 		if _outline_mesh_instance != null:
 			_outline_mesh_instance.visible = false
 		if _footprint_marker != null:
@@ -149,11 +212,9 @@ func _apply_preview_color() -> void:
 
 	if _preview_material == null:
 		_preview_material = StandardMaterial3D.new()
-		# Alpha hash is more stable for voxel previews than regular alpha blending,
-		# which can self-sort badly and appear to disappear from some camera angles.
-		_preview_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
-		_preview_material.albedo_color = PREVIEW_VALID_COLOR
-		_preview_material.roughness = 0.18
+		_preview_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_preview_material.albedo_color = _with_alpha(PREVIEW_VALID_COLOR, 0.34)
+		_preview_material.roughness = 0.22
 		_preview_material.metallic = 0.0
 		_preview_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		_preview_material.emission_enabled = true
@@ -178,7 +239,7 @@ func _apply_preview_color() -> void:
 
 	var base_color: Color = PREVIEW_VALID_COLOR if _preview_is_valid else PREVIEW_INVALID_COLOR
 	var emphasis_color: Color = base_color.lerp(Color.WHITE, 0.28 if _is_hovered else 0.1)
-	_preview_material.albedo_color = base_color
+	_preview_material.albedo_color = _with_alpha(base_color, 0.34 if _preview_is_valid else 0.42)
 	_preview_material.emission = base_color * (0.36 if _preview_is_valid else 0.52)
 
 	if _outline_material != null:
@@ -196,8 +257,10 @@ func _apply_preview_color() -> void:
 		_footprint_marker.scale = Vector3.ONE * (1.06 if _is_hovered else 1.0)
 
 	for mesh_instance in _mesh_instances:
+		mesh_instance.visible = true
 		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mesh_instance.material_override = _preview_material
+		mesh_instance.material_override = null
+		mesh_instance.material_overlay = _preview_material
 
 func _build_outline_mesh(size: Vector3) -> ImmediateMesh:
 	var half_size: Vector3 = size * 0.5

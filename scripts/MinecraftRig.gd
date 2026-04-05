@@ -2,6 +2,10 @@
 class_name MinecraftRig
 extends Node3D
 
+const MinecraftRigMeshBuilder := preload("res://scripts/minecraft_rig/minecraft_rig_mesh_builder.gd")
+const MinecraftRigSkinResources := preload("res://scripts/minecraft_rig/minecraft_rig_skin_resources.gd")
+const MinecraftSkinUv := preload("res://scripts/minecraft_rig/minecraft_skin_uv.gd")
+
 enum SkinModel {
 	CLASSIC,
 	SLIM,
@@ -149,61 +153,85 @@ func _build_parts() -> void:
 	var arm_width_px := 3.0 if _skin_model == SkinModel.SLIM else 4.0
 	var shoulder_x_px := 4.0 + arm_width_px * 0.5
 
-	leg_r = _create_part(
+	leg_r = MinecraftRigMeshBuilder.create_part(
+		model_root,
+		_outer_meshes,
+		material_inner,
+		material_outer,
 		"RightLeg",
 		Vector3(4, 12, 4),
-		_right_leg_uv(true),
-		_right_leg_uv(false),
+		MinecraftSkinUv.right_leg_uv(true),
+		MinecraftSkinUv.right_leg_uv(false),
 		PivotMode.TOP,
 		BODY_OUTER_INFLATE_PX
 	)
 	leg_r.position = Vector3(-2.0 * PX, 12.0 * PX, 0.0)
 
-	leg_l = _create_part(
+	leg_l = MinecraftRigMeshBuilder.create_part(
+		model_root,
+		_outer_meshes,
+		material_inner,
+		material_outer,
 		"LeftLeg",
 		Vector3(4, 12, 4),
-		_left_leg_uv(true),
-		_left_leg_uv(false),
+		MinecraftSkinUv.left_leg_uv(true),
+		MinecraftSkinUv.left_leg_uv(false),
 		PivotMode.TOP,
 		BODY_OUTER_INFLATE_PX
 	)
 	leg_l.position = Vector3(2.0 * PX, 12.0 * PX, 0.0)
 
-	body = _create_part(
+	body = MinecraftRigMeshBuilder.create_part(
+		model_root,
+		_outer_meshes,
+		material_inner,
+		material_outer,
 		"Body",
 		Vector3(8, 12, 4),
-		_body_uv(true),
-		_body_uv(false),
+		MinecraftSkinUv.body_uv(true),
+		MinecraftSkinUv.body_uv(false),
 		PivotMode.CENTER,
 		BODY_OUTER_INFLATE_PX
 	)
 	body.position = Vector3(0.0, 18.0 * PX, 0.0)
 
-	head = _create_part(
+	head = MinecraftRigMeshBuilder.create_part(
+		model_root,
+		_outer_meshes,
+		material_inner,
+		material_outer,
 		"Head",
 		Vector3(8, 8, 8),
-		_head_uv(true),
-		_head_uv(false),
+		MinecraftSkinUv.head_uv(true),
+		MinecraftSkinUv.head_uv(false),
 		PivotMode.BOTTOM,
 		HEAD_OUTER_INFLATE_PX
 	)
 	head.position = Vector3(0.0, 24.0 * PX, 0.0)
 
-	arm_r = _create_part(
+	arm_r = MinecraftRigMeshBuilder.create_part(
+		model_root,
+		_outer_meshes,
+		material_inner,
+		material_outer,
 		"RightArm",
 		Vector3(arm_width_px, 12, 4),
-		_right_arm_uv(true, _skin_model == SkinModel.SLIM),
-		_right_arm_uv(false, _skin_model == SkinModel.SLIM),
+		MinecraftSkinUv.right_arm_uv(true, _skin_model == SkinModel.SLIM),
+		MinecraftSkinUv.right_arm_uv(false, _skin_model == SkinModel.SLIM),
 		PivotMode.TOP,
 		BODY_OUTER_INFLATE_PX
 	)
 	arm_r.position = Vector3(-shoulder_x_px * PX, 24.0 * PX, 0.0)
 
-	arm_l = _create_part(
+	arm_l = MinecraftRigMeshBuilder.create_part(
+		model_root,
+		_outer_meshes,
+		material_inner,
+		material_outer,
 		"LeftArm",
 		Vector3(arm_width_px, 12, 4),
-		_left_arm_uv(true, _skin_model == SkinModel.SLIM),
-		_left_arm_uv(false, _skin_model == SkinModel.SLIM),
+		MinecraftSkinUv.left_arm_uv(true, _skin_model == SkinModel.SLIM),
+		MinecraftSkinUv.left_arm_uv(false, _skin_model == SkinModel.SLIM),
 		PivotMode.TOP,
 		BODY_OUTER_INFLATE_PX
 	)
@@ -236,169 +264,6 @@ func _animate_part(part: Node3D, target_rotation: Vector3, target_position: Vect
 	part.rotation.z = lerp_angle(part.rotation.z, target_rotation.z, blend)
 	part.position = part.position.lerp(target_position, blend)
 
-func _create_part(
-	part_name: String,
-	size_px: Vector3,
-	inner_uv: Dictionary,
-	outer_uv: Dictionary,
-	pivot_mode: PivotMode,
-	outer_inflate_px: float
-) -> Node3D:
-	var pivot := Node3D.new()
-	pivot.name = part_name
-	model_root.add_child(pivot)
-
-	var inner := MeshInstance3D.new()
-	inner.name = "Inner"
-	inner.mesh = _build_cuboid(size_px, inner_uv, 0.0)
-	inner.position = _mesh_offset_for_pivot(size_px, pivot_mode)
-	inner.material_override = material_inner
-	pivot.add_child(inner)
-
-	var outer := MeshInstance3D.new()
-	outer.name = "Outer"
-	outer.mesh = _build_cuboid(size_px, outer_uv, outer_inflate_px)
-	outer.position = _mesh_offset_for_pivot(size_px, pivot_mode)
-	outer.material_override = material_outer
-	pivot.add_child(outer)
-
-	_outer_meshes.append(outer)
-
-	if part_name == "Head": head = pivot
-	elif part_name == "Body": body = pivot
-	elif part_name == "RightArm": arm_r = pivot
-	elif part_name == "LeftArm": arm_l = pivot
-	elif part_name == "RightLeg": leg_r = pivot
-	elif part_name == "LeftLeg": leg_l = pivot
-
-	return pivot
-
-func _mesh_offset_for_pivot(size_px: Vector3, pivot_mode: PivotMode) -> Vector3:
-	var half_h := size_px.y * 0.5 * PX
-
-	match pivot_mode:
-		PivotMode.TOP:
-			return Vector3(0.0, -half_h, 0.0)
-		PivotMode.BOTTOM:
-			return Vector3(0.0, half_h, 0.0)
-		_:
-			return Vector3.ZERO
-
-func _build_cuboid(size_px: Vector3, uv_map: Dictionary, inflate_px: float) -> ArrayMesh:
-	var hx := size_px.x * 0.5 * PX + inflate_px * PX
-	var hy := size_px.y * 0.5 * PX + inflate_px * PX
-	var hz := size_px.z * 0.5 * PX + inflate_px * PX
-
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-
-	# Front (-Z)
-	_add_quad(
-		st,
-		Vector3(hx, hy, -hz),
-		Vector3(-hx, hy, -hz),
-		Vector3(-hx, -hy, -hz),
-		Vector3(hx, -hy, -hz),
-		uv_map["front"],
-		Vector3(0, 0, -1)
-	)
-
-	# Back (+Z)
-	_add_quad(
-		st,
-		Vector3(-hx, hy, hz),
-		Vector3(hx, hy, hz),
-		Vector3(hx, -hy, hz),
-		Vector3(-hx, -hy, hz),
-		uv_map["back"],
-		Vector3(0, 0, 1)
-	)
-
-	# Right (+X)
-	_add_quad(
-		st,
-		Vector3(hx, hy, hz),
-		Vector3(hx, hy, -hz),
-		Vector3(hx, -hy, -hz),
-		Vector3(hx, -hy, hz),
-		uv_map["right"],
-		Vector3(1, 0, 0)
-	)
-
-	# Left (-X)
-	_add_quad(
-		st,
-		Vector3(-hx, hy, -hz),
-		Vector3(-hx, hy, hz),
-		Vector3(-hx, -hy, hz),
-		Vector3(-hx, -hy, -hz),
-		uv_map["left"],
-		Vector3(-1, 0, 0)
-	)
-
-	# Top (+Y)
-	_add_quad(
-		st,
-		Vector3(hx, hy, hz),
-		Vector3(-hx, hy, hz),
-		Vector3(-hx, hy, -hz),
-		Vector3(hx, hy, -hz),
-		uv_map["top"],
-		Vector3(0, 1, 0)
-	)
-
-	# Bottom (-Y)
-	_add_quad(
-		st,
-		Vector3(hx, -hy, -hz),
-		Vector3(-hx, -hy, -hz),
-		Vector3(-hx, -hy, hz),
-		Vector3(hx, -hy, hz),
-		uv_map["bottom"],
-		Vector3(0, -1, 0)
-	)
-
-	return st.commit()
-
-func _add_quad(
-	st: SurfaceTool,
-	a: Vector3,
-	b: Vector3,
-	c: Vector3,
-	d: Vector3,
-	uv_rect: Rect2,
-	normal: Vector3
-) -> void:
-	var uv := _rect_to_uv_clockwise(uv_rect)
-
-	_add_vertex(st, a, uv[0], normal)
-	_add_vertex(st, b, uv[1], normal)
-	_add_vertex(st, c, uv[2], normal)
-
-	_add_vertex(st, a, uv[0], normal)
-	_add_vertex(st, c, uv[2], normal)
-	_add_vertex(st, d, uv[3], normal)
-
-func _add_vertex(st: SurfaceTool, vertex: Vector3, uv: Vector2, normal: Vector3) -> void:
-	st.set_normal(normal)
-	st.set_uv(uv)
-	st.add_vertex(vertex)
-
-func _rect_to_uv_clockwise(rect: Rect2) -> Array[Vector2]:
-	var tex_size := 64.0
-	var u0 := rect.position.x / tex_size
-	var v0 := rect.position.y / tex_size
-	var u1 := (rect.position.x + rect.size.x) / tex_size
-	var v1 := (rect.position.y + rect.size.y) / tex_size
-
-	# TL, TR, BR, BL
-	return [
-		Vector2(u0, v0),
-		Vector2(u1, v0),
-		Vector2(u1, v1),
-		Vector2(u0, v1),
-	]
-
 func load_skin_from_file(file_path: String) -> bool:
 	var image := Image.load_from_file(file_path)
 	if image == null or image.is_empty():
@@ -415,26 +280,7 @@ func load_skin_from_file(file_path: String) -> bool:
 	return true
 
 func _load_skin_texture(path: String) -> Texture2D:
-	if path.strip_edges() == "":
-		return ImageTexture.create_from_image(_make_fallback_skin())
-
-	# Wait! The earlier AI explicitly noted load() vs Image.load_from_file!
-	# The script handles checking ResourceLoader.exists logic, so let's blend the safe approach:
-	if path.begins_with("res://") and ResourceLoader.exists(path):
-		var res = load(path)
-		if res is Texture2D:
-			return res
-
-	var image := Image.load_from_file(path)
-	if image == null or image.is_empty():
-		push_warning("Could not load skin: %s" % path)
-		return ImageTexture.create_from_image(_make_fallback_skin())
-
-	if image.get_width() != 64 or image.get_height() != 64:
-		push_warning("Skin must be 64x64: %s" % path)
-		return ImageTexture.create_from_image(_make_fallback_skin())
-
-	return ImageTexture.create_from_image(image)
+	return MinecraftRigSkinResources.load_skin_texture(path)
 
 func _apply_texture(texture: Texture2D) -> void:
 	if material_inner == null or material_outer == null:
@@ -446,11 +292,6 @@ func _apply_outer_visibility() -> void:
 	for mesh in _outer_meshes:
 		if is_instance_valid(mesh):
 			mesh.visible = _show_outer_layer
-
-func _make_fallback_skin() -> Image:
-	var image := Image.create(64, 64, false, Image.FORMAT_RGBA8)
-	image.fill(Color(0.6, 0.4, 0.2, 1.0)) # Plain brown default skin!
-	return image
 
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
@@ -541,94 +382,3 @@ func _process(delta: float) -> void:
 	_animate_part(arm_r, Vector3(arm_r_rotation, arm_yaw, 0.08 if move_weight >= 0.05 else 0.0), arm_r_position, blend)
 	_animate_part(leg_l, Vector3(leg_l_rotation, 0.0, leg_roll), leg_l_position, blend)
 	_animate_part(leg_r, Vector3(leg_r_rotation, 0.0, leg_roll), leg_r_position, blend)
-
-func _head_uv(base_layer: bool) -> Dictionary:
-	var ox := 0 if base_layer else 32
-	return {
-		"right": Rect2(ox + 0, 8, 8, 8),
-		"front": Rect2(ox + 8, 8, 8, 8),
-		"left": Rect2(ox + 16, 8, 8, 8),
-		"back": Rect2(ox + 24, 8, 8, 8),
-		"top": Rect2(ox + 8, 0, 8, 8),
-		"bottom": Rect2(ox + 16, 0, 8, 8),
-	}
-
-func _body_uv(base_layer: bool) -> Dictionary:
-	var oy := 16 if base_layer else 32
-	return {
-		"right": Rect2(16, oy + 4, 4, 12),
-		"front": Rect2(20, oy + 4, 8, 12),
-		"left": Rect2(28, oy + 4, 4, 12),
-		"back": Rect2(32, oy + 4, 8, 12),
-		"top": Rect2(20, oy + 0, 8, 4),
-		"bottom": Rect2(28, oy + 0, 8, 4),
-	}
-
-func _right_leg_uv(base_layer: bool) -> Dictionary:
-	var oy := 16 if base_layer else 32
-	return {
-		"right": Rect2(0, oy + 4, 4, 12),
-		"front": Rect2(4, oy + 4, 4, 12),
-		"left": Rect2(8, oy + 4, 4, 12),
-		"back": Rect2(12, oy + 4, 4, 12),
-		"top": Rect2(4, oy + 0, 4, 4),
-		"bottom": Rect2(8, oy + 0, 4, 4),
-	}
-
-func _left_leg_uv(base_layer: bool) -> Dictionary:
-	var ox := 16 if base_layer else 0
-	var oy := 48
-	return {
-		"right": Rect2(ox + 0, oy + 4, 4, 12),
-		"front": Rect2(ox + 4, oy + 4, 4, 12),
-		"left": Rect2(ox + 8, oy + 4, 4, 12),
-		"back": Rect2(ox + 12, oy + 4, 4, 12),
-		"top": Rect2(ox + 4, oy + 0, 4, 4),
-		"bottom": Rect2(ox + 8, oy + 0, 4, 4),
-	}
-
-func _right_arm_uv(base_layer: bool, slim: bool) -> Dictionary:
-	var ox := 40
-	var oy := 16 if base_layer else 32
-
-	if slim:
-		return {
-			"right": Rect2(ox + 0, oy + 4, 4, 12),
-			"front": Rect2(ox + 4, oy + 4, 3, 12),
-			"left": Rect2(ox + 7, oy + 4, 4, 12),
-			"back": Rect2(ox + 11, oy + 4, 3, 12),
-			"top": Rect2(ox + 4, oy + 0, 3, 4),
-			"bottom": Rect2(ox + 7, oy + 0, 3, 4),
-		}
-
-	return {
-		"right": Rect2(ox + 0, oy + 4, 4, 12),
-		"front": Rect2(ox + 4, oy + 4, 4, 12),
-		"left": Rect2(ox + 8, oy + 4, 4, 12),
-		"back": Rect2(ox + 12, oy + 4, 4, 12),
-		"top": Rect2(ox + 4, oy + 0, 4, 4),
-		"bottom": Rect2(ox + 8, oy + 0, 4, 4),
-	}
-
-func _left_arm_uv(base_layer: bool, slim: bool) -> Dictionary:
-	var ox := 32 if base_layer else 48
-	var oy := 48
-
-	if slim:
-		return {
-			"right": Rect2(ox + 0, oy + 4, 4, 12),
-			"front": Rect2(ox + 4, oy + 4, 3, 12),
-			"left": Rect2(ox + 7, oy + 4, 4, 12),
-			"back": Rect2(ox + 11, oy + 4, 3, 12),
-			"top": Rect2(ox + 4, oy + 0, 3, 4),
-			"bottom": Rect2(ox + 7, oy + 0, 3, 4),
-		}
-
-	return {
-		"right": Rect2(ox + 0, oy + 4, 4, 12),
-		"front": Rect2(ox + 4, oy + 4, 4, 12),
-		"left": Rect2(ox + 8, oy + 4, 4, 12),
-		"back": Rect2(ox + 12, oy + 4, 4, 12),
-		"top": Rect2(ox + 4, oy + 0, 4, 4),
-		"bottom": Rect2(ox + 8, oy + 0, 4, 4),
-	}

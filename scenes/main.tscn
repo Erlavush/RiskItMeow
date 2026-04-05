@@ -2,7 +2,10 @@
 
 [ext_resource type="PackedScene" uid="uid://wvmdc0hnjr3m" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/room/room_shell.tscn" id="2_room_shell"]
-[ext_resource type="Script" path="res://scripts/placement/placement_manager.gd" id="3_placement_manager"]
+[ext_resource type="Script" uid="uid://hjtwhs7ns3d2" path="res://scripts/placement/placement_manager.gd" id="3_placement_manager"]
+[ext_resource type="Script" uid="uid://ck4pyf3nqjkgu" path="res://scripts/debug/developer_environment_panel.gd" id="4_developer_panel"]
+[ext_resource type="Script" path="res://scripts/room/room_cutaway_controller.gd" id="5_room_cutaway"]
+[ext_resource type="Script" path="res://scripts/room/room_sunlight_controller.gd" id="6_room_sunlight"]
 [ext_resource type="Script" uid="uid://by86v04yuhj3s" path="res://scripts/camera/room_view_camera_controller.gd" id="7_room_camera"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
@@ -22,31 +25,29 @@ sky_material = SubResource("ProceduralSkyMaterial_main")
 background_mode = 2
 sky = SubResource("Sky_main")
 ambient_light_source = 3
-ambient_light_color = Color(0.803922, 0.882353, 0.980392, 1)
-ambient_light_sky_contribution = 0.75
-ambient_light_energy = 0.55
+ambient_light_color = Color(0.8086377, 0.8827942, 0.9745096, 1)
+ambient_light_sky_contribution = 0.42
+ambient_light_energy = 0.68
 reflected_light_source = 2
 tonemap_mode = 2
-tonemap_exposure = 1.05
+tonemap_exposure = 1.07
 tonemap_white = 4.0
 glow_enabled = true
 glow_levels/2 = 0.45
 glow_levels/3 = 0.2
-glow_bloom = 0.08
-glow_hdr_scale = 1.4
-fog_enabled = true
+glow_hdr_scale = 1.71
 fog_mode = 1
-fog_light_color = Color(0.745098, 0.890196, 1, 1)
+fog_light_color = Color(0.74957836, 0.8906411, 0.994, 1)
 fog_light_energy = 0.7
 fog_sun_scatter = 0.12
-fog_density = 0.12
+fog_density = 0.115
 fog_aerial_perspective = 1.0
 fog_depth_curve = 1.35
-fog_depth_end = 40.0
+fog_depth_end = 38.0
 adjustment_enabled = true
 adjustment_brightness = 1.02
-adjustment_contrast = 1.05
-adjustment_saturation = 1.06
+adjustment_contrast = 1.08
+adjustment_saturation = 1.07
 
 [node name="World" type="Node3D" unique_id=173874473]
 
@@ -55,17 +56,19 @@ environment = SubResource("Environment_main")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=2083213727]
 transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 10, 0)
-light_energy = 1.1
+light_color = Color(1, 1, 0.994, 1)
+light_energy = 1.11
 shadow_enabled = true
-shadow_opacity = 0.75
-shadow_blur = 0.25
+shadow_blur = 2.05
 directional_shadow_fade_start = 1.0
-directional_shadow_max_distance = 30.0
 
 [node name="RoomShell" parent="." unique_id=877916492 instance=ExtResource("2_room_shell")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.018832207, 2.3841858e-07, -0.015720844)
-show_walls = false
-show_ceiling = false
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.031985283, -0.0033729076, -0.017820835)
+room_half_extents = Vector2(4, 4)
+wall_height = 4.0
+floor_thickness = 0.25
+wall_thickness = 0.25
+wall_color = Color(0.909804, 0.870588, 0.854902, 1)
 
 [node name="RoomViewCameraController" type="Node3D" parent="." unique_id=553861112]
 script = ExtResource("7_room_camera")
@@ -79,6 +82,25 @@ script = ExtResource("3_placement_manager")
 room_shell_path = NodePath("../RoomShell")
 room_camera_controller_path = NodePath("../RoomViewCameraController")
 player_path = NodePath("../Player")
+
+[node name="RoomCutawayController" type="Node" parent="." unique_id=211638950]
+script = ExtResource("5_room_cutaway")
+room_shell_path = NodePath("../RoomShell")
+room_camera_controller_path = NodePath("../RoomViewCameraController")
+placement_manager_path = NodePath("../PlacementManager")
+
+[node name="RoomSunlightController" type="Node3D" parent="." unique_id=212004391]
+script = ExtResource("6_room_sunlight")
+room_shell_path = NodePath("../RoomShell")
+placement_manager_path = NodePath("../PlacementManager")
+directional_light_path = NodePath("../DirectionalLight3D")
+developer_environment_panel_path = NodePath("../DeveloperEnvironmentPanel")
+
+[node name="DeveloperEnvironmentPanel" type="CanvasLayer" parent="." unique_id=1192864111]
+layer = 20
+script = ExtResource("4_developer_panel")
+world_environment_path = NodePath("../WorldEnvironment")
+directional_light_path = NodePath("../DirectionalLight3D")
 
 [node name="Player" parent="." unique_id=1826654061 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.85)
