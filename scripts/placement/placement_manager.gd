@@ -7,6 +7,7 @@ signal room_layout_visuals_changed
 const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const PlacementInventoryCatalog := preload("res://scripts/placement/placement_inventory_catalog.gd")
 const PlacementGizmoFactory := preload("res://scripts/placement/placement_gizmo_factory.gd")
+const PlacementBrowserCard := preload("res://scripts/placement/placement_browser_card.gd")
 const PlacementRoomLayoutStore := preload("res://scripts/placement/placement_room_layout_store.gd")
 const PlacementSurfaceQueries := preload("res://scripts/placement/placement_surface_queries.gd")
 const PlacementUiStyles := preload("res://scripts/placement/placement_ui_styles.gd")
@@ -26,6 +27,8 @@ const WALL_SNAP_SIZE := 0.25
 const EDITOR_PREVIEW_POLL_SECONDS := 0.6
 const EDITOR_MODE_BUILD := "build"
 const EDITOR_MODE_EDIT := "edit"
+const BROWSER_MODE_INVENTORY := "inventory"
+const BROWSER_MODE_SHOP := "shop"
 const PLACEMENT_SESSION_NONE := ""
 const PLACEMENT_SESSION_NEW := "new"
 const PLACEMENT_SESSION_EDIT := "edit"
@@ -40,9 +43,13 @@ var _inventory_item_defs: Array[Dictionary] = PlacementInventoryCatalog.build_it
 @export var player_path: NodePath
 
 var _item_stock: Dictionary = {}
+var _item_owned_totals: Dictionary = {}
 var _placed_item_counts: Dictionary = {}
+var _shop_categories: Array[String] = []
 var _manual_grid_visible := false
 var _editor_mode := EDITOR_MODE_BUILD
+var _browser_mode := BROWSER_MODE_INVENTORY
+var _selected_shop_category := ""
 var _placement_active := false
 var _placement_valid := false
 var _placement_issue_code := ""
@@ -72,14 +79,19 @@ var _gizmo_handle_base_colors := {}
 var _ui_layer: CanvasLayer
 var _ui_root: Control
 var _inventory_panel: PanelContainer
-var _inventory_buttons: Dictionary = {}
-var _inventory_stock_labels: Dictionary = {}
 var _mode_buttons: Dictionary = {}
+var _browser_mode_buttons: Dictionary = {}
+var _shop_category_buttons: Dictionary = {}
 var _floor_style_buttons: Dictionary = {}
 var _panel_title_label: Label
 var _mode_label: Label
+var _browser_section_label: Label
 var _status_label: Label
 var _floor_style_label: Label
+var _browser_scroll: ScrollContainer
+var _browser_grid: GridContainer
+var _shop_category_scroll: ScrollContainer
+var _shop_category_flow: HFlowContainer
 var _grid_toggle_button: Button
 var _save_button: Button
 var _load_button: Button
@@ -125,6 +137,7 @@ func _ready() -> void:
 	_build_grid_overlay()
 	_build_gizmo()
 	_build_ui()
+	_cleanup_stray_placeable_artifacts()
 	_sync_player_with_room()
 	_load_room_layout_on_startup()
 	_update_inventory_ui()
@@ -134,11 +147,15 @@ func _ready() -> void:
 
 func _initialize_inventory_state() -> void:
 	_item_stock.clear()
+	_item_owned_totals.clear()
 	_placed_item_counts.clear()
+	_shop_categories = PlacementInventoryCatalog.build_category_names(_inventory_item_defs)
+	_selected_shop_category = _shop_categories[0] if not _shop_categories.is_empty() else ""
 	for item_def in _inventory_item_defs:
 		var item_id: String = String(item_def.get("id", ""))
-		var initial_stock: int = int(item_def.get("initial_stock", 0))
-		_item_stock[item_id] = initial_stock
+		var initial_owned := PlacementInventoryCatalog.get_initial_owned(item_def)
+		_item_stock[item_id] = initial_owned
+		_item_owned_totals[item_id] = initial_owned
 		_placed_item_counts[item_id] = 0
 
 func _process(_delta: float) -> void:
@@ -309,7 +326,11 @@ func _build_ui() -> void:
 	_inventory_panel = PanelContainer.new()
 	_inventory_panel.name = "InventoryPanel"
 	_inventory_panel.position = UI_MARGIN
-	_inventory_panel.custom_minimum_size = Vector2(292.0, 0.0)
+	_inventory_panel.custom_minimum_size = Vector2(388.0, 0.0)
+	_inventory_panel.add_theme_stylebox_override(
+		"panel",
+		PlacementUiStyles.make_panel_style(Color(0.14, 0.18, 0.21, 0.9), Color(0.28, 0.34, 0.4, 0.96))
+	)
 	_ui_root.add_child(_inventory_panel)
 
 	var margin := MarginContainer.new()
@@ -324,7 +345,7 @@ func _build_ui() -> void:
 	margin.add_child(layout)
 
 	_panel_title_label = Label.new()
-	_panel_title_label.text = "Build & Edit"
+	_panel_title_label.text = "Build Browser"
 	layout.add_child(_panel_title_label)
 
 	_mode_label = Label.new()
@@ -341,8 +362,42 @@ func _build_ui() -> void:
 	var mode_separator := HSeparator.new()
 	layout.add_child(mode_separator)
 
-	for item_def in _inventory_item_defs:
-		_add_inventory_entry(layout, item_def)
+	_browser_section_label = Label.new()
+	_browser_section_label.text = "Browser"
+	layout.add_child(_browser_section_label)
+
+	var browser_mode_row := HBoxContainer.new()
+	browser_mode_row.add_theme_constant_override("separation", 8)
+	layout.add_child(browser_mode_row)
+
+	_add_browser_mode_button(browser_mode_row, "Inventory", BROWSER_MODE_INVENTORY)
+	_add_browser_mode_button(browser_mode_row, "Shop", BROWSER_MODE_SHOP)
+
+	_shop_category_scroll = ScrollContainer.new()
+	_shop_category_scroll.custom_minimum_size = Vector2(0.0, 42.0)
+	_shop_category_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_shop_category_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_shop_category_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	layout.add_child(_shop_category_scroll)
+
+	_shop_category_flow = HFlowContainer.new()
+	_shop_category_flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_shop_category_flow.add_theme_constant_override("h_separation", 6)
+	_shop_category_flow.add_theme_constant_override("v_separation", 6)
+	_shop_category_scroll.add_child(_shop_category_flow)
+
+	_browser_scroll = ScrollContainer.new()
+	_browser_scroll.custom_minimum_size = Vector2(0.0, 420.0)
+	_browser_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_browser_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	layout.add_child(_browser_scroll)
+
+	_browser_grid = GridContainer.new()
+	_browser_grid.columns = 2
+	_browser_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_browser_grid.add_theme_constant_override("h_separation", 10)
+	_browser_grid.add_theme_constant_override("v_separation", 10)
+	_browser_scroll.add_child(_browser_grid)
 
 	var floor_separator := HSeparator.new()
 	layout.add_child(floor_separator)
@@ -472,8 +527,12 @@ func _build_ui() -> void:
 	_popup_hint_label.add_theme_font_size_override("font_size", 11)
 	popup_layout.add_child(_popup_hint_label)
 
+	_rebuild_shop_category_tabs()
+	_rebuild_item_browser()
 	_update_mode_ui()
+	_update_browser_mode_ui()
 	_update_popup_visuals()
+	_update_floor_style_ui()
 
 func _add_mode_button(parent: HBoxContainer, title_text: String, mode_id: String) -> void:
 	var button := Button.new()
@@ -485,27 +544,74 @@ func _add_mode_button(parent: HBoxContainer, title_text: String, mode_id: String
 	parent.add_child(button)
 	_mode_buttons[mode_id] = button
 
-func _add_inventory_entry(parent: VBoxContainer, item_def: Dictionary) -> void:
-	var item_id: String = String(item_def.get("id", ""))
-	var display_name: String = String(item_def.get("display_name", item_id))
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	parent.add_child(row)
-
+func _add_browser_mode_button(parent: HBoxContainer, title_text: String, mode_id: String) -> void:
 	var button := Button.new()
-	button.text = display_name
-	button.custom_minimum_size = Vector2(208.0, 40.0)
+	button.text = title_text
+	button.toggle_mode = true
+	button.custom_minimum_size = Vector2(126.0, 34.0)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.pressed.connect(_on_inventory_item_button_pressed.bind(item_id))
-	row.add_child(button)
-	_inventory_buttons[item_id] = button
+	button.pressed.connect(_on_browser_mode_button_pressed.bind(mode_id))
+	parent.add_child(button)
+	_browser_mode_buttons[mode_id] = button
 
-	var stock_label := Label.new()
-	stock_label.custom_minimum_size = Vector2(54.0, 0.0)
-	stock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	row.add_child(stock_label)
-	_inventory_stock_labels[item_id] = stock_label
+func _rebuild_shop_category_tabs() -> void:
+	if _shop_category_flow == null:
+		return
+	for child in _shop_category_flow.get_children():
+		_shop_category_flow.remove_child(child)
+		child.queue_free()
+	_shop_category_buttons.clear()
+
+	for category_name in _shop_categories:
+		var button := Button.new()
+		button.text = category_name
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(84.0, 30.0)
+		button.pressed.connect(_on_shop_category_button_pressed.bind(category_name))
+		_shop_category_flow.add_child(button)
+		_shop_category_buttons[category_name] = button
+
+func _rebuild_item_browser() -> void:
+	if _browser_grid == null:
+		return
+
+	for child in _browser_grid.get_children():
+		_browser_grid.remove_child(child)
+		child.queue_free()
+
+	var item_factory := Callable(self, "_create_item_instance_from_definition")
+	for item_def in _get_visible_browser_item_defs():
+		var item_id := String(item_def.get("id", ""))
+		var card := PlacementBrowserCard.new()
+		card.add_theme_stylebox_override(
+			"panel",
+			PlacementUiStyles.make_panel_style(Color(0.1, 0.13, 0.16, 0.92), Color(0.24, 0.34, 0.43, 0.96), 1, 12)
+		)
+		card.configure(
+			item_def,
+			_browser_mode,
+			int(_item_stock.get(item_id, 0)),
+			int(_item_owned_totals.get(item_id, 0)),
+			item_factory
+		)
+		card.place_requested.connect(_on_inventory_item_button_pressed)
+		card.buy_requested.connect(_on_shop_buy_requested)
+		_browser_grid.add_child(card)
+
+func _get_visible_browser_item_defs() -> Array[Dictionary]:
+	var visible_items: Array[Dictionary] = []
+	for item_def in _inventory_item_defs:
+		var item_id := String(item_def.get("id", ""))
+		if _browser_mode == BROWSER_MODE_INVENTORY:
+			if int(_item_owned_totals.get(item_id, 0)) <= 0:
+				continue
+			visible_items.append(item_def)
+			continue
+
+		if not _selected_shop_category.is_empty() and String(item_def.get("category", "")) != _selected_shop_category:
+			continue
+		visible_items.append(item_def)
+	return visible_items
 
 func _add_floor_style_button(parent: HBoxContainer, title_text: String, style_id: int) -> void:
 	var button := Button.new()
@@ -569,15 +675,56 @@ func _save_room_layout() -> bool:
 	var layout := PlacementRoomLayoutStore.serialize_layout(
 		_placed_items_root,
 		Callable(self, "_resolve_item_id_for_placeable"),
-		_get_current_floor_style()
+		_get_current_floor_style(),
+		_item_owned_totals
 	)
 	return PlacementRoomLayoutStore.save_layout(layout)
 
 func _load_room_layout_data() -> Dictionary:
 	return PlacementRoomLayoutStore.load_layout_data()
 
+func _build_default_owned_stock() -> Dictionary:
+	var defaults: Dictionary = {}
+	for item_def in _inventory_item_defs:
+		var item_id := String(item_def.get("id", ""))
+		defaults[item_id] = PlacementInventoryCatalog.get_initial_owned(item_def)
+	return defaults
+
+func _build_owned_stock_from_layout(layout: Dictionary) -> Dictionary:
+	var owned_stock := _build_default_owned_stock()
+	var loaded_owned_stock := PlacementRoomLayoutStore.deserialize_owned_stock(layout.get("owned_stock", {}))
+	for item_id in loaded_owned_stock.keys():
+		owned_stock[String(item_id)] = int(loaded_owned_stock[item_id])
+
+	var raw_items: Variant = layout.get("items", [])
+	if raw_items is Array:
+		var placed_counts: Dictionary = {}
+		for raw_item in raw_items:
+			if typeof(raw_item) != TYPE_DICTIONARY:
+				continue
+			var item_entry := raw_item as Dictionary
+			var item_id := String(item_entry.get("item_id", ""))
+			if item_id.is_empty():
+				continue
+			placed_counts[item_id] = int(placed_counts.get(item_id, 0)) + 1
+		for item_id in placed_counts.keys():
+			owned_stock[item_id] = maxi(int(owned_stock.get(item_id, 0)), int(placed_counts[item_id]))
+
+	return owned_stock
+
+func _apply_owned_stock_state(owned_stock: Dictionary) -> void:
+	_item_stock.clear()
+	_item_owned_totals.clear()
+	for item_def in _inventory_item_defs:
+		var item_id := String(item_def.get("id", ""))
+		var owned_total := maxi(0, int(owned_stock.get(item_id, PlacementInventoryCatalog.get_initial_owned(item_def))))
+		_item_owned_totals[item_id] = owned_total
+		_item_stock[item_id] = owned_total
+		_placed_item_counts[item_id] = 0
+
 func _rebuild_room_from_layout(layout: Dictionary) -> void:
 	_clear_room(false)
+	_apply_owned_stock_state(_build_owned_stock_from_layout(layout))
 
 	if _room_shell != null and _room_shell.has_method("set_floor_style"):
 		_room_shell.call("set_floor_style", int(layout.get("floor_style", FLOOR_STYLE_COZY_BROWN)))
@@ -682,7 +829,9 @@ func _clear_room(save_after_clear: bool = true) -> void:
 	for child in _placed_items_root.get_children():
 		child.free()
 
-	_initialize_inventory_state()
+	for item_id in _item_owned_totals.keys():
+		_item_stock[item_id] = int(_item_owned_totals.get(item_id, 0))
+		_placed_item_counts[item_id] = 0
 	_wall_openings_signature = ""
 	_sync_room_wall_openings()
 	_update_inventory_ui()
@@ -797,10 +946,19 @@ func _append_wall_opening_for_placeable(openings_by_surface: Dictionary, placeab
 
 func _create_item_instance(item_id: String) -> SimpleWoodChair:
 	var item_def: Dictionary = _get_item_definition(item_id)
+	if item_def.is_empty():
+		return null
+	if PlacementInventoryCatalog.uses_imported_scene_factory(item_def):
+		return PlacementInventoryCatalog.create_imported_scene_instance(item_def)
 	var item_script: Script = _get_item_script(item_def)
-	if item_def.is_empty() or item_script == null:
+	if item_script == null:
 		return null
 	return item_script.new() as SimpleWoodChair
+
+func _create_item_instance_from_definition(item_def: Dictionary) -> SimpleWoodChair:
+	if item_def.is_empty():
+		return null
+	return _create_item_instance(String(item_def.get("id", "")))
 
 func _activate_preview_session(preview_item: SimpleWoodChair, item_id: String, session_kind: String, rename_preview: bool) -> void:
 	if preview_item == null:
@@ -1003,6 +1161,35 @@ func _on_inventory_item_button_pressed(item_id: String) -> void:
 		return
 	_start_inventory_placement(item_id)
 
+func _on_shop_buy_requested(item_id: String) -> void:
+	var item_def := _get_item_definition(item_id)
+	if item_def.is_empty():
+		return
+	_item_owned_totals[item_id] = int(_item_owned_totals.get(item_id, 0)) + 1
+	_item_stock[item_id] = int(_item_stock.get(item_id, 0)) + 1
+	call_deferred("_update_inventory_ui")
+	call_deferred("_update_status_text")
+	_autosave_room_layout()
+
+func _on_browser_mode_button_pressed(mode_id: String) -> void:
+	if _placement_active:
+		return
+	if mode_id == _browser_mode:
+		return
+	_browser_mode = mode_id
+	_update_browser_mode_ui()
+	_update_inventory_ui()
+	_update_status_text()
+
+func _on_shop_category_button_pressed(category_name: String) -> void:
+	if _placement_active:
+		return
+	if category_name == _selected_shop_category:
+		return
+	_selected_shop_category = category_name
+	_update_browser_mode_ui()
+	_update_inventory_ui()
+
 func _on_mode_button_pressed(mode_id: String) -> void:
 	if _placement_active or mode_id == _editor_mode:
 		return
@@ -1149,16 +1336,8 @@ func _refresh_preview_validity() -> void:
 
 func _update_inventory_ui() -> void:
 	var grid_visible := _manual_grid_visible or _placement_active or _is_edit_mode()
-	for item_def in _inventory_item_defs:
-		var item_id: String = String(item_def.get("id", ""))
-		var current_stock: int = int(_item_stock.get(item_id, 0))
-		var initial_stock: int = int(item_def.get("initial_stock", 0))
-		var button := _inventory_buttons.get(item_id) as Button
-		var stock_label := _inventory_stock_labels.get(item_id) as Label
-		if button != null:
-			button.disabled = current_stock <= 0 or _placement_active or _is_edit_mode()
-		if stock_label != null:
-			stock_label.text = "%d/%d" % [current_stock, initial_stock]
+	_update_browser_mode_ui()
+	_rebuild_item_browser()
 	if _grid_toggle_button != null:
 		if _is_edit_mode():
 			_grid_toggle_button.text = "Grid Overlay: On (Edit Mode)"
@@ -1172,6 +1351,11 @@ func _update_inventory_ui() -> void:
 		_load_button.disabled = _placement_active
 	if _clear_room_button != null:
 		_clear_room_button.disabled = _placement_active
+	if _browser_section_label != null:
+		if _browser_mode == BROWSER_MODE_SHOP:
+			_browser_section_label.text = "Shop Catalog: %s" % (_selected_shop_category if not _selected_shop_category.is_empty() else "All")
+		else:
+			_browser_section_label.text = "Inventory (%d owned)" % _get_owned_item_type_count()
 
 func _update_mode_ui() -> void:
 	for mode_id in _mode_buttons.keys():
@@ -1182,9 +1366,54 @@ func _update_mode_ui() -> void:
 		var is_selected := String(mode_id) == _editor_mode
 		button.button_pressed = is_selected
 		button.disabled = is_selected or _placement_active
+		PlacementUiStyles.apply_button_style(
+			button,
+			Color(0.21, 0.27, 0.32, 0.98) if not is_selected else Color(0.22, 0.48, 0.34, 0.98),
+			Color(0.38, 0.46, 0.54, 0.98) if not is_selected else Color(0.42, 0.98, 0.62, 0.98),
+			Color(0.96, 0.98, 1.0, 1.0)
+		)
 
 	if _mode_label != null:
 		_mode_label.text = "Mode: %s" % ("Edit" if _is_edit_mode() else "Build")
+
+func _update_browser_mode_ui() -> void:
+	for mode_id in _browser_mode_buttons.keys():
+		var button := _browser_mode_buttons.get(mode_id) as Button
+		if button == null:
+			continue
+		var is_selected := String(mode_id) == _browser_mode
+		button.button_pressed = is_selected
+		button.disabled = is_selected or _placement_active
+		PlacementUiStyles.apply_button_style(
+			button,
+			Color(0.2, 0.28, 0.34, 0.98) if not is_selected else Color(0.24, 0.48, 0.62, 0.98),
+			Color(0.4, 0.52, 0.62, 0.98) if not is_selected else Color(0.58, 0.86, 1.0, 0.98),
+			Color(0.96, 0.98, 1.0, 1.0)
+		)
+
+	if _shop_category_scroll != null:
+		_shop_category_scroll.visible = _browser_mode == BROWSER_MODE_SHOP
+
+	for category_name in _shop_category_buttons.keys():
+		var category_button := _shop_category_buttons.get(category_name) as Button
+		if category_button == null:
+			continue
+		var is_selected_category := String(category_name) == _selected_shop_category
+		category_button.button_pressed = is_selected_category
+		category_button.disabled = _placement_active or (is_selected_category and _browser_mode == BROWSER_MODE_SHOP)
+		PlacementUiStyles.apply_button_style(
+			category_button,
+			Color(0.19, 0.24, 0.28, 0.98) if not is_selected_category else Color(0.44, 0.34, 0.16, 0.98),
+			Color(0.34, 0.42, 0.48, 0.98) if not is_selected_category else Color(0.96, 0.72, 0.38, 0.98),
+			Color(0.95, 0.96, 0.98, 1.0)
+		)
+
+func _get_owned_item_type_count() -> int:
+	var count := 0
+	for item_id in _item_owned_totals.keys():
+		if int(_item_owned_totals.get(item_id, 0)) > 0:
+			count += 1
+	return count
 
 func _update_floor_style_ui() -> void:
 	var current_style := FLOOR_STYLE_COZY_BROWN
@@ -1199,6 +1428,12 @@ func _update_floor_style_ui() -> void:
 		var is_selected := int(style_id) == current_style
 		button.button_pressed = is_selected
 		button.disabled = is_selected
+		PlacementUiStyles.apply_button_style(
+			button,
+			Color(0.25, 0.21, 0.17, 0.98) if not is_selected else Color(0.52, 0.38, 0.18, 0.98),
+			Color(0.42, 0.34, 0.26, 0.98) if not is_selected else Color(0.96, 0.76, 0.36, 0.98),
+			Color(0.98, 0.97, 0.95, 1.0)
+		)
 
 	if _floor_style_label != null:
 		_floor_style_label.text = "Floor Finish: %s" % ("Brown Mat" if current_style == FLOOR_STYLE_COZY_BROWN else "Checkerboard")
@@ -1245,10 +1480,10 @@ func _update_status_text() -> void:
 		return
 
 	if not _has_any_stock():
-		_status_label.text = "All inventory items are deployed.\nUse the grid toggle if you still want to inspect spacing."
+		_status_label.text = "No available inventory stock right now.\nOpen Shop to buy more items, or switch to Edit to move what is already placed."
 		return
 
-	_status_label.text = "Choose an item to start placement.\nThe dotted grid will turn on automatically while placing."
+	_status_label.text = "Choose an owned item from Inventory to place it.\nOpen Shop to buy more furniture. The dotted grid will turn on automatically while placing."
 
 func _update_grid_visibility() -> void:
 	if _grid_overlay == null:
@@ -1587,3 +1822,25 @@ func _build_wall_openings_signature(openings_by_surface: Dictionary) -> String:
 
 func _notify_room_layout_visuals_changed() -> void:
 	room_layout_visuals_changed.emit()
+
+func _cleanup_stray_placeable_artifacts() -> void:
+	var stray_placeables: Array[SimpleWoodChair] = []
+	_collect_stray_placeables_recursive(self, stray_placeables)
+	for placeable in stray_placeables:
+		if placeable == null or not is_instance_valid(placeable):
+			continue
+		if placeable == _preview_item:
+			continue
+		if _placed_items_root != null and _placed_items_root.is_ancestor_of(placeable):
+			continue
+		if placeable.get_parent() != null:
+			placeable.get_parent().remove_child(placeable)
+		placeable.queue_free()
+
+func _collect_stray_placeables_recursive(node: Node, output: Array[SimpleWoodChair]) -> void:
+	for child in node.get_children():
+		var placeable := child as SimpleWoodChair
+		if placeable != null:
+			output.append(placeable)
+			continue
+		_collect_stray_placeables_recursive(child, output)

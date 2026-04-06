@@ -32,6 +32,9 @@ func _ready() -> void:
 	if name.is_empty() or name.begins_with("@"):
 		name = get_display_name()
 
+	ensure_runtime_visual_setup()
+
+func ensure_runtime_visual_setup() -> void:
 	_ensure_collision_shape()
 	_ensure_visual()
 	_ensure_feedback_visuals()

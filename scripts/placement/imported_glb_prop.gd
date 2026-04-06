@@ -105,7 +105,7 @@ func _extract_visual_data() -> Dictionary:
 			child_node.position -= recenter_offset
 
 	bounds["size"] = maximum - minimum
-	bounds["visual_y_offset"] = minf(0.0, minimum.y)
+	bounds["visual_y_offset"] = 0.0
 	return {
 		"root": extracted_root,
 		"bounds": bounds,

@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://kc36ce6sttxm"
-path="res://.godot/imported/gltf_embedded_17.png-7bb1d7c9499df465a22f97573efbadfc.ctex"
+path="res://.godot/imported/gltf_embedded_17.png-96b1209666ccfb202f9bbbccd58470a5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://temporary/fnaf-minecraft-pizzeria-mini-pack/textures/gltf_embedded_17.png"
-dest_files=["res://.godot/imported/gltf_embedded_17.png-7bb1d7c9499df465a22f97573efbadfc.ctex"]
+source_file="res://assets/props/fnaf-minecraft-pizzeria-pack/textures/gltf_embedded_17.png"
+dest_files=["res://.godot/imported/gltf_embedded_17.png-96b1209666ccfb202f9bbbccd58470a5.ctex"]
 
 [params]
 

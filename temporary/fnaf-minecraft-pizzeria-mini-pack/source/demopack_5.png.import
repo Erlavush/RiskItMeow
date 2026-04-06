@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b3f2aqmm2olow"
-path.s3tc="res://.godot/imported/demopack_5.png-7cc4768f6d3900a5357bba01ba5c122e.s3tc.ctex"
+path.s3tc="res://.godot/imported/demopack_5.png-02b29f2b7fe7eff6bdcbe00089506f99.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -14,8 +14,8 @@ generator_parameters={
 
 [deps]
 
-source_file="res://temporary/fnaf-minecraft-pizzeria-mini-pack/source/demopack_5.png"
-dest_files=["res://.godot/imported/demopack_5.png-7cc4768f6d3900a5357bba01ba5c122e.s3tc.ctex"]
+source_file="res://assets/props/fnaf-minecraft-pizzeria-pack/source/demopack_5.png"
+dest_files=["res://.godot/imported/demopack_5.png-02b29f2b7fe7eff6bdcbe00089506f99.s3tc.ctex"]
 
 [params]
 

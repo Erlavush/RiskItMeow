@@ -4,12 +4,12 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://cedug3qbotpch"
-path="res://.godot/imported/demopack.gltf-8eca30aa07854a0a9fe0c2248a78d31d.scn"
+path="res://.godot/imported/demopack.gltf-652c7cf9de47bff0df5ebe7024d8b04b.scn"
 
 [deps]
 
-source_file="res://temporary/fnaf-minecraft-pizzeria-mini-pack/source/demopack.gltf"
-dest_files=["res://.godot/imported/demopack.gltf-8eca30aa07854a0a9fe0c2248a78d31d.scn"]
+source_file="res://assets/props/fnaf-minecraft-pizzeria-pack/source/demopack.gltf"
+dest_files=["res://.godot/imported/demopack.gltf-652c7cf9de47bff0df5ebe7024d8b04b.scn"]
 
 [params]
 
