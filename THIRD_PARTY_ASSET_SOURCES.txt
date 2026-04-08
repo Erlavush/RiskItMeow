@@ -1,0 +1,47 @@
+Risk It Meow
+Third-Party Asset Sources
+
+This file tracks the external assets that are still used by the live runtime catalog after repo cleanup.
+
+1. Titillium Web font
+Source: https://github.com/google/fonts/tree/main/ofl/titilliumweb
+License: SIL Open Font License 1.1
+Used for: in-game UI, debug studio UI, placement UI
+
+2. Voxel Chair
+Source: https://sketchfab.com/3d-models/voxel-chair-da5f9c0594464b19a316ea2ccac3eb74
+Author: Gundy
+Author profile: https://sketchfab.com/RomualdDubois
+License: CC-BY-4.0
+Used for: Simple Wood Chair
+Local files: assets/props/simple_wood_chair
+
+3. FNAF Minecraft Pizzeria Mini-Pack
+Source: https://sketchfab.com/3d-models/fnaf-minecraft-pizzeria-mini-pack-4b6d5151af0a4ccfb5750c6399cfc741
+Author: VoxelBear
+License: CC Attribution (CC BY)
+Used objects: OfficeChair, OfficeTable + Conputer, Fridge
+Used for: Office Chair, Office Desk + Computer, Fridge
+Local files: assets/props/fnaf-minecraft-pizzeria-pack
+
+4. window
+Source: https://sketchfab.com/3d-models/window-2811eb28fa7a49b4adb86b948f75ff37
+Author: x_d1off
+Author profile: https://sketchfab.com/x_d1off
+License: Sketchfab Standard
+Used for: Window
+Local files: assets/props/three_window
+
+5. Small Shelf
+Source: not preserved in the repo metadata
+License: unknown from local files
+Used for: Small Shelf
+Local files: assets/props/small_shelf
+Note: the embedded glTF metadata only identifies "Blockbench 5.1.2 glTF exporter" and does not include an author or source URL.
+
+6. Window (Classic)
+Source: not preserved in the repo metadata
+License: unknown from local files
+Used for: Window (Classic)
+Local files: assets/props/window
+Note: the GLB metadata identifies "obj2gltf" as the generator but does not include an author or source URL.
