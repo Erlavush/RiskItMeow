@@ -2,7 +2,6 @@
 class_name SimpleWoodChair
 extends StaticBody3D
 
-const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const DISPLAY_NAME := "Simple Wood Chair"
 const VISUAL_SCENE_PATH := "res://assets/props/simple_wood_chair/scene.gltf"
 const VISUAL_SCALE := Vector3.ONE * 0.25
@@ -15,6 +14,7 @@ const PREVIEW_INVALID_COLOR := Color(0.96, 0.28, 0.28, 0.86)
 const FOOTPRINT_THICKNESS := 0.025
 const FOOTPRINT_PADDING := 0.14
 const OUTLINE_PADDING := 0.08
+const WALL_MOUNT_CLEARANCE := 0.01
 
 var _is_preview := false
 var _preview_is_valid := true
@@ -43,8 +43,14 @@ func ensure_runtime_visual_setup() -> void:
 func get_display_name() -> String:
 	return DISPLAY_NAME
 
+func get_primary_mount_kind() -> String:
+	return RoomConstants.MOUNT_FLOOR
+
+func get_mount_kinds() -> Array[String]:
+	return [get_primary_mount_kind()]
+
 func get_placement_surface_kind() -> String:
-	return RoomConstants.FLOOR_SURFACE
+	return RoomConstants.SURFACE_DECOR if get_primary_mount_kind() == RoomConstants.MOUNT_WALL else RoomConstants.FLOOR_SURFACE
 
 func get_default_wall_surface() -> String:
 	return RoomConstants.WALL_BACK
@@ -55,12 +61,20 @@ func get_supported_wall_surfaces() -> Array[String]:
 func requires_wall_opening() -> bool:
 	return false
 
+func hides_with_cutaway_wall() -> bool:
+	return requires_wall_opening()
+
 func get_wall_half_extents() -> Vector2:
 	var collision_size := get_collision_size()
 	return Vector2(collision_size.x * 0.5, collision_size.y * 0.5)
 
 func get_wall_opening_half_extents() -> Vector2:
 	return Vector2.ZERO
+
+func get_wall_mount_depth_offset() -> float:
+	if requires_wall_opening():
+		return 0.0
+	return get_collision_size().z * 0.5 + WALL_MOUNT_CLEARANCE
 
 func supports_rotation() -> bool:
 	return true
@@ -77,6 +91,21 @@ func get_collision_center_offset() -> Vector3:
 func get_footprint_half_extents() -> Vector2:
 	var collision_size := get_collision_size()
 	return Vector2(collision_size.x * 0.5, collision_size.z * 0.5)
+
+func can_host_surface_items() -> bool:
+	return false
+
+func get_support_surfaces() -> Array[Dictionary]:
+	return []
+
+func build_top_support_surface(surface_id: String = "top") -> Dictionary:
+	var top_center_y := get_collision_center_offset().y + get_collision_size().y * 0.5
+	var padded_half_extents := get_footprint_half_extents() - Vector2.ONE * 0.06
+	return {
+		"id": surface_id,
+		"center_offset": Vector3(0.0, top_center_y, 0.0),
+		"half_extents": Vector2(maxf(padded_half_extents.x, 0.08), maxf(padded_half_extents.y, 0.08)),
+	}
 
 func get_visual_scene_path() -> String:
 	return VISUAL_SCENE_PATH

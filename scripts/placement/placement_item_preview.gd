@@ -169,7 +169,7 @@ func _accumulate_bounds_recursive(node: Node, parent_transform: Transform3D, sta
 	for child in node.get_children():
 		_accumulate_bounds_recursive(child, current_transform, state)
 
-func _merge_mesh_aabb(aabb: AABB, transform: Transform3D, state: Dictionary) -> void:
+func _merge_mesh_aabb(aabb: AABB, aabb_transform: Transform3D, state: Dictionary) -> void:
 	var corners: Array[Vector3] = [
 		aabb.position,
 		aabb.position + Vector3(aabb.size.x, 0.0, 0.0),
@@ -181,7 +181,7 @@ func _merge_mesh_aabb(aabb: AABB, transform: Transform3D, state: Dictionary) -> 
 		aabb.position + aabb.size,
 	]
 	for corner in corners:
-		var world_corner: Vector3 = transform * corner
+		var world_corner: Vector3 = aabb_transform * corner
 		if not state.get("ready", false):
 			state["ready"] = true
 			state["min"] = world_corner

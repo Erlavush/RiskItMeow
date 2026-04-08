@@ -1,9 +1,8 @@
 class_name PlacementRoomLayoutStore
 extends RefCounted
 
-const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const SAVE_PATH := "user://room_layout.json"
-const VERSION := 2
+const VERSION := 3
 
 static func serialize_vector3(value: Vector3) -> Dictionary:
 	return {
@@ -40,32 +39,54 @@ static func deserialize_owned_stock(raw_value: Variant) -> Dictionary:
 		owned_stock[String(key_variant)] = maxi(0, int(raw_dict.get(key_variant, 0)))
 	return owned_stock
 
-static func serialize_layout(placed_items_root: Node3D, item_id_resolver: Callable, floor_style: int, owned_stock: Dictionary = {}) -> Dictionary:
+static func serialize_layout(placed_items_root: Node3D, item_id_resolver: Callable, instance_id_resolver: Callable, floor_style: int, owned_stock: Dictionary = {}) -> Dictionary:
 	var items: Array[Dictionary] = []
-	for child in placed_items_root.get_children():
-		var placeable := child as SimpleWoodChair
-		if placeable == null:
-			continue
-
-		var item_id := String(item_id_resolver.call(placeable))
-		if item_id.is_empty():
-			continue
-
-		items.append(
-			{
-				"item_id": item_id,
-				"position": serialize_vector3(placeable.global_position),
-				"rotation_y": snappedf(placeable.rotation.y, 0.001),
-				"placement_surface": String(placeable.get_meta("placement_surface")) if placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE,
-			}
-		)
-
+	_serialize_placeables_recursive(placed_items_root, item_id_resolver, instance_id_resolver, items)
 	return {
 		"version": VERSION,
 		"floor_style": floor_style,
 		"owned_stock": serialize_owned_stock(owned_stock),
 		"items": items,
 	}
+
+static func _serialize_placeables_recursive(node: Node, item_id_resolver: Callable, instance_id_resolver: Callable, output: Array[Dictionary]) -> void:
+	for child in node.get_children():
+		var placeable := child as SimpleWoodChair
+		if placeable != null:
+			var item_id := String(item_id_resolver.call(placeable))
+			if not item_id.is_empty():
+				output.append(_serialize_placeable(placeable, item_id, instance_id_resolver))
+			_serialize_placeables_recursive(placeable, item_id_resolver, instance_id_resolver, output)
+			continue
+		_serialize_placeables_recursive(child, item_id_resolver, instance_id_resolver, output)
+
+static func _serialize_placeable(placeable: SimpleWoodChair, item_id: String, instance_id_resolver: Callable) -> Dictionary:
+	var instance_id := String(instance_id_resolver.call(placeable))
+	var entry := {
+		"instance_id": instance_id,
+		"item_id": item_id,
+		"rotation_y": snappedf(placeable.rotation.y, 0.001),
+	}
+
+	var host_placeable := placeable.get_parent() as SimpleWoodChair
+	if host_placeable != null:
+		entry["position"] = serialize_vector3(placeable.position)
+		entry["attachment"] = {
+			"kind": RoomConstants.ATTACHMENT_SUPPORT_SURFACE,
+			"host_instance_id": String(instance_id_resolver.call(host_placeable)),
+			"surface_id": String(placeable.get_meta("host_surface_id")) if placeable.has_meta("host_surface_id") else "top",
+		}
+		entry["placement_surface"] = RoomConstants.MOUNT_SURFACE
+		return entry
+
+	var placement_surface := String(placeable.get_meta("placement_surface")) if placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
+	entry["position"] = serialize_vector3(placeable.global_position)
+	entry["placement_surface"] = placement_surface
+	entry["attachment"] = {
+		"kind": RoomConstants.ATTACHMENT_ROOM,
+		"surface": placement_surface,
+	}
+	return entry
 
 static func save_layout(layout: Dictionary, path: String = SAVE_PATH) -> bool:
 	var file := FileAccess.open(path, FileAccess.WRITE)

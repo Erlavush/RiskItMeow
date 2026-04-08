@@ -2,9 +2,6 @@
 class_name RoomShell
 extends Node3D
 
-const RoomConstants := preload("res://scripts/room/room_constants.gd")
-const RoomFloorMaterials := preload("res://scripts/room/room_floor_materials.gd")
-const RoomWallSegments := preload("res://scripts/room/room_wall_segments.gd")
 const EDITOR_PREVIEW_FLOOR_LIFT := 0.04
 const SURFACE_SHADOWS_ONLY := GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 const SURFACE_SHADOWS_ON := GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -25,14 +22,14 @@ enum FloorStyle {
 @export var show_wall_front: bool = true
 @export var show_wall_right: bool = true
 @export var show_ceiling: bool = true
-@export_enum("Brown Mat", "Checkerboard") var floor_style: int = FloorStyle.COZY_BROWN
+@export var floor_style: FloorStyle = FloorStyle.COZY_BROWN
 
 @export var floor_color: Color = Color(0.843, 0.745, 0.612, 1.0)
 @export var wall_color: Color = Color(0.956, 0.929, 0.882, 1.0)
 @export var trim_color: Color = Color(0.745, 0.627, 0.486, 1.0)
 @export var ceiling_color: Color = Color(0.984, 0.972, 0.941, 1.0)
 
-@onready var floor: Node3D = $floor
+@onready var floor_node: Node3D = $floor
 @onready var wall_back: Node3D = $wall_back
 @onready var wall_left: Node3D = $wall_left
 @onready var wall_front: Node3D = $wall_front
@@ -187,12 +184,12 @@ func clear_surface_cutaways() -> void:
 func is_surface_cutaway(surface_name: String) -> bool:
 	return bool(_surface_cutaway_states.get(surface_name, false))
 
-func set_surface_visible(surface_name: String, is_visible: bool) -> void:
+func set_surface_visible(surface_name: String, visible_state: bool) -> void:
 	var surface: Node3D = _get_surface_node(surface_name)
 	if surface == null:
 		return
 
-	var should_be_visible := is_visible and _is_surface_enabled(surface_name)
+	var should_be_visible := visible_state and _is_surface_enabled(surface_name)
 	if RoomConstants.is_wall_surface(surface_name):
 		_set_wall_segments_visible(surface, should_be_visible, bool(_surface_cutaway_states.get(surface_name, false)))
 		var wall_visual := surface.get_node_or_null("Visual") as VisualInstance3D
@@ -225,7 +222,7 @@ func is_surface_visible(surface_name: String) -> bool:
 	return _is_surface_enabled(surface_name)
 
 func set_floor_style(style_value: int) -> void:
-	var next_style := clampi(style_value, FloorStyle.COZY_BROWN, FloorStyle.CHECKERBOARD)
+	var next_style := clampi(style_value, FloorStyle.COZY_BROWN, FloorStyle.CHECKERBOARD) as FloorStyle
 	if floor_style == next_style:
 		return
 
@@ -242,7 +239,7 @@ func _configure_floor() -> void:
 		room_half_extents.y * 2.0
 	)
 	var floor_center := Vector3(0.0, _get_floor_center_y(), 0.0)
-	_configure_surface(floor, floor_center, floor_size, floor_color)
+	_configure_surface(floor_node, floor_center, floor_size, floor_color)
 	_apply_floor_material()
 
 func _configure_walls() -> void:
@@ -363,8 +360,8 @@ func _normalize_wall_openings(raw_openings: Variant) -> Array[Dictionary]:
 func _build_wall_openings_signature(openings: Array[Dictionary]) -> String:
 	return JSON.stringify(openings)
 
-func _set_wall_segments_visible(surface: Node3D, is_visible: bool, is_cutaway: bool = false) -> void:
-	RoomWallSegments.set_segments_visible(surface, is_visible, is_cutaway, SURFACE_SHADOWS_ONLY, SURFACE_SHADOWS_ON)
+func _set_wall_segments_visible(surface: Node3D, visible_state: bool, is_cutaway: bool = false) -> void:
+	RoomWallSegments.set_segments_visible(surface, visible_state, is_cutaway, SURFACE_SHADOWS_ONLY, SURFACE_SHADOWS_ON)
 
 func _apply_surface_render_state(surface_name: String) -> void:
 	var surface := _get_surface_node(surface_name)
@@ -389,7 +386,7 @@ func _apply_surface_render_state(surface_name: String) -> void:
 func _get_surface_node(surface_name: String) -> Node3D:
 	match surface_name:
 		RoomConstants.FLOOR_SURFACE:
-			return floor
+			return floor_node
 		RoomConstants.WALL_BACK:
 			return wall_back
 		RoomConstants.WALL_LEFT:
@@ -404,7 +401,7 @@ func _get_surface_node(surface_name: String) -> Node3D:
 			return null
 
 func _get_surface_name(surface: Node3D) -> String:
-	if surface == floor:
+	if surface == floor_node:
 		return RoomConstants.FLOOR_SURFACE
 	if surface == wall_back:
 		return RoomConstants.WALL_BACK
@@ -451,5 +448,5 @@ func _is_wall_enabled(surface_name: String) -> bool:
 			return false
 
 func _apply_floor_material() -> void:
-	var visual := floor.get_node_or_null("Visual") as MeshInstance3D
+	var visual := floor_node.get_node_or_null("Visual") as MeshInstance3D
 	RoomFloorMaterials.apply_floor_material(visual, floor_style, room_half_extents)

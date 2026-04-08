@@ -4,7 +4,7 @@ extends RefCounted
 
 const CACHE_ROOT := "res://assets/ui/item_previews"
 
-static func should_use_cached_preview(item_def: Dictionary) -> bool:
+static func should_use_cached_preview(_item_def: Dictionary) -> bool:
 	return true
 
 static func get_preview_source_path(item_def: Dictionary) -> String:

@@ -1,7 +1,6 @@
 class_name RoomWallSegments
 extends RefCounted
 
-const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const WALL_SEGMENTS_ROOT_NAME := "RuntimeSegments"
 
 static func configure_wall_surface(
@@ -44,7 +43,7 @@ static func configure_wall_surface(
 			wall_material
 		)
 
-static func set_segments_visible(surface: Node3D, is_visible: bool, is_cutaway: bool, shadows_only: int, shadows_on: int) -> void:
+static func set_segments_visible(surface: Node3D, visible_state: bool, is_cutaway: bool, shadows_only: int, shadows_on: int) -> void:
 	var segments_root := surface.get_node_or_null(WALL_SEGMENTS_ROOT_NAME) as Node3D
 	if segments_root == null:
 		return
@@ -56,13 +55,13 @@ static func set_segments_visible(surface: Node3D, is_visible: bool, is_cutaway: 
 
 		var visual := segment_root.get_node_or_null("Visual") as VisualInstance3D
 		if visual != null:
-			visual.visible = is_visible
-			visual.cast_shadow = shadows_only if is_visible and is_cutaway else shadows_on
+			visual.visible = visible_state
+			visual.cast_shadow = shadows_only if visible_state and is_cutaway else shadows_on
 
 		var collider_body := segment_root.get_node_or_null("Collider") as CollisionObject3D
 		if collider_body != null:
 			collider_body.disable_mode = CollisionObject3D.DISABLE_MODE_REMOVE
-			collider_body.process_mode = Node.PROCESS_MODE_INHERIT if is_visible else Node.PROCESS_MODE_DISABLED
+			collider_body.process_mode = Node.PROCESS_MODE_INHERIT if visible_state else Node.PROCESS_MODE_DISABLED
 
 static func _build_wall_segment_defs(surface_name: String, size: Vector3, wall_thickness: float, raw_openings: Variant) -> Array[Dictionary]:
 	var horizontal_span: float = size.x if surface_name == RoomConstants.WALL_BACK or surface_name == RoomConstants.WALL_FRONT else size.z

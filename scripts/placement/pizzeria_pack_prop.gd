@@ -76,9 +76,9 @@ func _extract_visual_data() -> Dictionary:
 		if source_node == null:
 			continue
 
-		var duplicate: Node3D = source_node.duplicate() as Node3D
-		if duplicate != null:
-			extracted_root.add_child(duplicate)
+		var duplicated_node: Node3D = source_node.duplicate() as Node3D
+		if duplicated_node != null:
+			extracted_root.add_child(duplicated_node)
 
 	source_root.free()
 
@@ -151,7 +151,7 @@ func _accumulate_node_bounds(node: Node, parent_transform: Transform3D, state: D
 	for child in node.get_children():
 		_accumulate_node_bounds(child, current_transform, state)
 
-func _merge_aabb(aabb: AABB, transform: Transform3D, state: Dictionary) -> void:
+func _merge_aabb(aabb: AABB, aabb_transform: Transform3D, state: Dictionary) -> void:
 	var corners: Array[Vector3] = [
 		aabb.position,
 		aabb.position + Vector3(aabb.size.x, 0.0, 0.0),
@@ -164,7 +164,7 @@ func _merge_aabb(aabb: AABB, transform: Transform3D, state: Dictionary) -> void:
 	]
 
 	for corner in corners:
-		var transformed_corner: Vector3 = transform * corner
+		var transformed_corner: Vector3 = aabb_transform * corner
 		if not state.get("ready", false):
 			state["min"] = transformed_corner
 			state["max"] = transformed_corner

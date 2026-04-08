@@ -1,9 +1,5 @@
 extends SceneTree
 
-const PlacementInventoryCatalog := preload("res://scripts/placement/placement_inventory_catalog.gd")
-const PlacementItemPreview := preload("res://scripts/placement/placement_item_preview.gd")
-const PlacementPreviewCache := preload("res://scripts/placement/placement_preview_cache.gd")
-
 var _root_control: Control
 
 func _init() -> void:

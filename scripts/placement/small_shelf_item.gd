@@ -10,3 +10,9 @@ func get_display_name() -> String:
 
 func get_source_scene_path() -> String:
 	return "res://assets/props/small_shelf/small_shelf.glb"
+
+func can_host_surface_items() -> bool:
+	return true
+
+func get_support_surfaces() -> Array[Dictionary]:
+	return [build_top_support_surface()]

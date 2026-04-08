@@ -1,5 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
+.godot_user/
+.godot_user_test/
 .import/
 export.cfg
 export_presets.cfg

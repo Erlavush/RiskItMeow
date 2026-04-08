@@ -19,3 +19,9 @@ func get_collision_size() -> Vector3:
 
 func get_footprint_half_extents() -> Vector2:
 	return DESK_FOOTPRINT_HALF_EXTENTS
+
+func can_host_surface_items() -> bool:
+	return true
+
+func get_support_surfaces() -> Array[Dictionary]:
+	return [build_top_support_surface()]

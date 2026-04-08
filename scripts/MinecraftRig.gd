@@ -2,10 +2,6 @@
 class_name MinecraftRig
 extends Node3D
 
-const MinecraftRigMeshBuilder := preload("res://scripts/minecraft_rig/minecraft_rig_mesh_builder.gd")
-const MinecraftRigSkinResources := preload("res://scripts/minecraft_rig/minecraft_rig_skin_resources.gd")
-const MinecraftSkinUv := preload("res://scripts/minecraft_rig/minecraft_skin_uv.gd")
-
 enum SkinModel {
 	CLASSIC,
 	SLIM,
@@ -20,6 +16,7 @@ enum PivotMode {
 const PX := 1.0 / 16.0
 const BODY_OUTER_INFLATE_PX := 0.25
 const HEAD_OUTER_INFLATE_PX := 0.5
+const FIRST_PERSON_EYE_OFFSET := Vector3(0.0, 6.0 * PX, -2.0 * PX)
 
 var _skin_model: SkinModel = SkinModel.CLASSIC
 @export var skin_model: SkinModel:
@@ -78,6 +75,8 @@ var _idle_time := 0.0
 var _walk_time := 0.0
 var _smoothed_speed := 0.0
 var _pose_ready := false
+var _first_person_active := false
+var _look_pitch := 0.0
 
 var _outer_meshes: Array[MeshInstance3D] = []
 var _rebuild_queued := false
@@ -110,6 +109,7 @@ func _rebuild() -> void:
 	_build_parts()
 	_cache_rest_pose()
 	_apply_outer_visibility()
+	_apply_first_person_visibility()
 
 func _ensure_materials() -> void:
 	material_inner = StandardMaterial3D.new()
@@ -292,6 +292,32 @@ func _apply_outer_visibility() -> void:
 	for mesh in _outer_meshes:
 		if is_instance_valid(mesh):
 			mesh.visible = _show_outer_layer
+	_apply_first_person_visibility()
+
+func set_first_person_view(active: bool, look_pitch: float = 0.0) -> void:
+	_first_person_active = active
+	_look_pitch = look_pitch if active else 0.0
+	_apply_first_person_visibility()
+
+func get_first_person_camera_global_position() -> Vector3:
+	if head == null:
+		return global_position + Vector3(0.0, 1.625, 0.0)
+	var planar_offset := global_basis * Vector3(FIRST_PERSON_EYE_OFFSET.x, 0.0, FIRST_PERSON_EYE_OFFSET.z)
+	planar_offset.y = 0.0
+	return head.global_position + Vector3.UP * FIRST_PERSON_EYE_OFFSET.y + planar_offset
+
+func _apply_first_person_visibility() -> void:
+	if head == null:
+		return
+
+	for child in head.get_children():
+		if not (child is MeshInstance3D):
+			continue
+		var mesh := child as MeshInstance3D
+		if mesh.name == "Outer":
+			mesh.visible = (not _first_person_active) and _show_outer_layer
+		else:
+			mesh.visible = not _first_person_active
 
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
@@ -361,6 +387,8 @@ func _process(delta: float) -> void:
 		arm_yaw * 0.8,
 		head_roll
 	)
+	if _first_person_active:
+		head_rotation.x += _look_pitch
 	var arm_l_rotation: float = arm_swing
 	var arm_r_rotation: float = -arm_swing
 	var leg_l_rotation: float = -leg_swing

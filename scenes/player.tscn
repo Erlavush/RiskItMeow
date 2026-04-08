@@ -237,3 +237,10 @@ margin = 0.2
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=1012588481]
 current = true
+
+[node name="FirstPersonPivot" type="Node3D" parent="." unique_id=190264881]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.625, 0)
+
+[node name="Camera3D" type="Camera3D" parent="FirstPersonPivot" unique_id=1315674504]
+near = 0.02
+fov = 72.0

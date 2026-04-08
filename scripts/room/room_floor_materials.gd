@@ -1,7 +1,6 @@
 class_name RoomFloorMaterials
 extends RefCounted
 
-const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const FloorCheckerShader := preload("res://shaders/floor_checker.gdshader")
 const FloorCozyBrownShader := preload("res://shaders/floor_cozy_brown.gdshader")
 const FloorCozyBrownTexturePath := "res://assets/textures/floors/dark_brown_linen_floor_32.png"

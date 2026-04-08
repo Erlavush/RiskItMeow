@@ -2,7 +2,6 @@
 class_name RoomSunlightController
 extends Node3D
 
-const RoomConstants := preload("res://scripts/room/room_constants.gd")
 const WINDOW_ITEM_IDS := ["window", "window_classic"]
 
 @export var room_shell_path: NodePath
@@ -78,7 +77,7 @@ func _ensure_bounce_light() -> void:
 	_bounce_light.visible = false
 	add_child(_bounce_light)
 
-func _sync_window_sunlight(force: bool = false) -> void:
+func _sync_window_sunlight(_force: bool = false) -> void:
 	if _room_shell == null or _placement_manager == null or _directional_light == null:
 		_set_portals_hidden()
 		if _bounce_light != null:
@@ -180,10 +179,10 @@ func _get_bounce_light_color() -> Color:
 		return Color(1.0, 0.82, 0.62, 1.0)
 	return _directional_light.light_color.lerp(Color(0.96, 0.76, 0.56, 1.0), 0.5)
 
-func _set_portal_light_visible(instance_id: int, is_visible: bool) -> void:
+func _set_portal_light_visible(instance_id: int, visible_state: bool) -> void:
 	var portal_light := _portal_lights.get(instance_id) as SpotLight3D
 	if portal_light != null:
-		portal_light.visible = is_visible
+		portal_light.visible = visible_state
 
 func _set_portals_hidden() -> void:
 	for portal_light in _portal_lights.values():

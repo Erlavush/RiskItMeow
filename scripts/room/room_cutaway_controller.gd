@@ -1,17 +1,17 @@
 class_name RoomCutawayController
 extends Node
 
-const RoomConstants := preload("res://scripts/room/room_constants.gd")
-
 @export var room_shell_path: NodePath
 @export var room_camera_controller_path: NodePath
 @export var placement_manager_path: NodePath
+@export var player_path: NodePath
 @export_range(0.2, 0.98, 0.01) var roof_show_dot_threshold: float = 0.86
 @export var enable_cutaway := true
 
 var _room_shell: RoomShell
 var _room_camera_controller: Node
 var _placement_manager: PlacementManager
+var _player: Node
 var _last_wall_cutaways: Dictionary = {
 	RoomConstants.WALL_BACK: false,
 	RoomConstants.WALL_LEFT: false,
@@ -24,6 +24,7 @@ func _ready() -> void:
 	_room_shell = get_node_or_null(room_shell_path) as RoomShell
 	_room_camera_controller = get_node_or_null(room_camera_controller_path)
 	_placement_manager = get_node_or_null(placement_manager_path) as PlacementManager
+	_player = get_node_or_null(player_path)
 	_apply_cutaway_state(true)
 
 func _process(_delta: float) -> void:
@@ -35,10 +36,14 @@ func _apply_cutaway_state(force: bool = false) -> void:
 
 	if not enable_cutaway:
 		if force:
-			_room_shell.clear_surface_cutaways()
-			if _placement_manager != null:
-				_placement_manager.clear_wall_surface_cutaways()
+			_clear_cutaway_state()
 		return
+
+	if _player != null and _player.has_method("get_camera_mode"):
+		var camera_mode := String(_player.call("get_camera_mode"))
+		if camera_mode == "first_person":
+			_clear_cutaway_state()
+			return
 
 	var camera := _get_active_camera()
 	if camera == null:
@@ -68,7 +73,29 @@ func _apply_cutaway_state(force: bool = false) -> void:
 		_last_roof_cutaway = next_roof_cutaway
 		_room_shell.set_surface_cutaway(RoomConstants.CEILING_SURFACE, next_roof_cutaway)
 
+func _clear_cutaway_state() -> void:
+	var needs_clear := _last_roof_cutaway
+	for surface_name in RoomConstants.WALL_SURFACES:
+		if bool(_last_wall_cutaways.get(surface_name, false)):
+			needs_clear = true
+			break
+	if not needs_clear:
+		return
+
+	for surface_name in RoomConstants.WALL_SURFACES:
+		_last_wall_cutaways[surface_name] = false
+		_room_shell.set_surface_cutaway(surface_name, false)
+		if _placement_manager != null:
+			_placement_manager.set_wall_surface_cutaway(surface_name, false)
+
+	_last_roof_cutaway = false
+	_room_shell.set_surface_cutaway(RoomConstants.CEILING_SURFACE, false)
+
 func _get_active_camera() -> Camera3D:
+	if _player != null and _player.has_method("get_active_camera"):
+		var player_camera := _player.call("get_active_camera") as Camera3D
+		if player_camera != null:
+			return player_camera
 	if _room_camera_controller != null and _room_camera_controller.has_method("get_camera"):
 		return _room_camera_controller.call("get_camera") as Camera3D
 	return get_viewport().get_camera_3d()

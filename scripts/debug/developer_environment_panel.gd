@@ -4,9 +4,6 @@ extends CanvasLayer
 
 signal environment_state_changed
 
-const DeveloperEnvironmentPersistence := preload("res://scripts/debug/developer_environment_persistence.gd")
-const DeveloperEnvironmentPresets := preload("res://scripts/debug/developer_environment_presets.gd")
-const DeveloperEnvironmentState := preload("res://scripts/debug/developer_environment_state.gd")
 const PANEL_WIDTH := 344.0
 const PANEL_HEIGHT := 620.0
 const EDGE_MARGIN := 16.0
@@ -22,10 +19,12 @@ const SUN_PRESET_AFTERNOON_COZY := DeveloperEnvironmentPresets.SUN_PRESET_AFTERN
 
 @export var world_environment_path: NodePath
 @export var directional_light_path: NodePath
+@export var debug_world_controller_path: NodePath
 
 var _world_environment: WorldEnvironment
 var _directional_light: DirectionalLight3D
 var _environment: Environment
+var _debug_world_controller: DebugWorldController
 
 var _default_values: Dictionary = {}
 var _base_ambient_color := Color.WHITE
@@ -37,18 +36,24 @@ var _syncing_controls := false
 var _ui_root: Control
 var _toggle_button: Button
 var _panel: PanelContainer
+var _debug_world_button: Button
 var _save_timer: Timer
 var _status_label: Label
 var _slider_bindings: Array[Dictionary] = []
 var _toggle_bindings: Array[Dictionary] = []
 var _editor_preview_poll_time := 0.0
 var _editor_persistent_signature := ""
+var _syncing_debug_world_button := false
 
 func _ready() -> void:
 	layer = 20
 	_world_environment = get_node_or_null(world_environment_path) as WorldEnvironment
 	_directional_light = get_node_or_null(directional_light_path) as DirectionalLight3D
 	_environment = _world_environment.environment if _world_environment != null else null
+	_debug_world_controller = get_node_or_null(debug_world_controller_path) as DebugWorldController
+	var debug_world_callback := Callable(self, "_on_debug_world_enabled_changed")
+	if _debug_world_controller != null and not _debug_world_controller.is_connected("debug_world_enabled_changed", debug_world_callback):
+		_debug_world_controller.connect("debug_world_enabled_changed", debug_world_callback)
 
 	_capture_defaults()
 	if Engine.is_editor_hint():
@@ -98,6 +103,7 @@ func _build_ui() -> void:
 	_toggle_button.offset_top = EDGE_MARGIN
 	_toggle_button.offset_bottom = EDGE_MARGIN + BUTTON_HEIGHT
 	_toggle_button.pressed.connect(_on_toggle_button_pressed)
+	PlacementUiStyles.apply_button_style(_toggle_button, PlacementUiStyles.COLOR_PANEL_ALT, PlacementUiStyles.COLOR_BORDER, PlacementUiStyles.COLOR_TEXT)
 	_ui_root.add_child(_toggle_button)
 
 	_panel = PanelContainer.new()
@@ -110,6 +116,10 @@ func _build_ui() -> void:
 	_panel.offset_top = EDGE_MARGIN + BUTTON_HEIGHT + 8.0
 	_panel.offset_bottom = EDGE_MARGIN + BUTTON_HEIGHT + 8.0 + PANEL_HEIGHT
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_panel.add_theme_stylebox_override(
+		"panel",
+		PlacementUiStyles.make_panel_style(PlacementUiStyles.COLOR_PANEL, PlacementUiStyles.COLOR_BORDER, 1, 16, 10, 0.22)
+	)
 	_ui_root.add_child(_panel)
 
 	var margin := MarginContainer.new()
@@ -126,12 +136,14 @@ func _build_ui() -> void:
 	var title := Label.new()
 	title.text = "Developer Environment"
 	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", PlacementUiStyles.COLOR_TEXT)
 	layout.add_child(title)
 
 	var subtitle := Label.new()
 	subtitle.text = "Developer-only tuning for lighting, fog, glow, and post-processing. Changes auto-save locally."
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	subtitle.add_theme_font_size_override("font_size", 12)
+	subtitle.add_theme_color_override("font_color", PlacementUiStyles.COLOR_TEXT_MUTED)
 	layout.add_child(subtitle)
 
 	var button_row := HBoxContainer.new()
@@ -142,17 +154,29 @@ func _build_ui() -> void:
 	reset_button.text = "Reset Defaults"
 	reset_button.pressed.connect(_on_reset_defaults_pressed)
 	reset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	PlacementUiStyles.apply_button_style(reset_button, PlacementUiStyles.COLOR_PANEL_ALT, PlacementUiStyles.COLOR_BORDER, PlacementUiStyles.COLOR_TEXT)
 	button_row.add_child(reset_button)
 
 	var clear_button := Button.new()
 	clear_button.text = "Clear Saved"
 	clear_button.pressed.connect(_on_clear_saved_pressed)
 	clear_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	PlacementUiStyles.apply_button_style(clear_button, PlacementUiStyles.COLOR_DANGER, PlacementUiStyles.COLOR_DANGER_BORDER, PlacementUiStyles.COLOR_TEXT)
 	button_row.add_child(clear_button)
+
+	_debug_world_button = Button.new()
+	_debug_world_button.toggle_mode = true
+	_debug_world_button.pressed.connect(_on_debug_world_button_pressed)
+	_debug_world_button.custom_minimum_size = Vector2(0.0, 34.0)
+	layout.add_child(_debug_world_button)
+	_update_debug_world_button_visual(_debug_world_controller != null and _debug_world_controller.is_debug_world_enabled())
+	if _debug_world_controller == null:
+		_debug_world_button.disabled = true
 
 	_status_label = Label.new()
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status_label.add_theme_font_size_override("font_size", 11)
+	_status_label.add_theme_color_override("font_color", PlacementUiStyles.COLOR_TEXT_MUTED)
 	layout.add_child(_status_label)
 
 	var scroll := ScrollContainer.new()
@@ -276,6 +300,47 @@ func _on_toggle_button_pressed() -> void:
 	var is_open := _toggle_button.button_pressed
 	_panel.visible = is_open
 	_toggle_button.text = "Developer [Hide]" if is_open else "Developer [Show]"
+	PlacementUiStyles.apply_button_style(
+		_toggle_button,
+		PlacementUiStyles.COLOR_ACCENT_DARK if is_open else PlacementUiStyles.COLOR_PANEL_ALT,
+		PlacementUiStyles.COLOR_ACCENT_BRIGHT if is_open else PlacementUiStyles.COLOR_BORDER,
+		PlacementUiStyles.COLOR_TEXT
+	)
+
+func _on_debug_world_button_pressed() -> void:
+	if _syncing_debug_world_button or _debug_world_controller == null or _debug_world_button == null:
+		return
+	_debug_world_controller.set_debug_world_enabled(_debug_world_button.button_pressed)
+
+func _on_debug_world_enabled_changed(enabled: bool) -> void:
+	if _toggle_button != null:
+		_toggle_button.visible = not enabled
+	if enabled and _panel != null and _panel.visible:
+		_panel.visible = false
+		if _toggle_button != null:
+			_toggle_button.button_pressed = false
+			_toggle_button.text = "Developer [Show]"
+			PlacementUiStyles.apply_button_style(
+				_toggle_button,
+				PlacementUiStyles.COLOR_PANEL_ALT,
+				PlacementUiStyles.COLOR_BORDER,
+				PlacementUiStyles.COLOR_TEXT
+			)
+	_update_debug_world_button_visual(enabled)
+
+func _update_debug_world_button_visual(enabled: bool) -> void:
+	if _debug_world_button == null:
+		return
+	_syncing_debug_world_button = true
+	_debug_world_button.button_pressed = enabled
+	_debug_world_button.text = "Debug World [Hide]" if enabled else "Debug World [Show]"
+	PlacementUiStyles.apply_button_style(
+		_debug_world_button,
+		PlacementUiStyles.COLOR_ACCENT_DARK if enabled else PlacementUiStyles.COLOR_PANEL_ALT,
+		PlacementUiStyles.COLOR_ACCENT_BRIGHT if enabled else PlacementUiStyles.COLOR_BORDER,
+		PlacementUiStyles.COLOR_TEXT
+	)
+	_syncing_debug_world_button = false
 
 func _on_sun_preset_pressed(preset_name: String) -> void:
 	_apply_sun_preset(preset_name)
