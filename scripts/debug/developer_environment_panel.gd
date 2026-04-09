@@ -296,8 +296,29 @@ func _add_toggle_control(parent: VBoxContainer, title_text: String, getter: Call
 		"getter": getter,
 	})
 
+func toggle_panel_open() -> void:
+	if _toggle_button == null or _panel == null or not _toggle_button.visible:
+		return
+	_set_panel_open(not _panel.visible)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if Engine.is_editor_hint() or event == null:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key_event := event as InputEventKey
+		if key_event.keycode == KEY_F6:
+			if _debug_world_controller != null and _debug_world_controller.is_debug_world_enabled():
+				return
+			toggle_panel_open()
+			get_viewport().set_input_as_handled()
+
 func _on_toggle_button_pressed() -> void:
-	var is_open := _toggle_button.button_pressed
+	_set_panel_open(_toggle_button.button_pressed)
+
+func _set_panel_open(is_open: bool) -> void:
+	if _toggle_button == null or _panel == null:
+		return
+	_toggle_button.button_pressed = is_open
 	_panel.visible = is_open
 	_toggle_button.text = "Developer [Hide]" if is_open else "Developer [Show]"
 	PlacementUiStyles.apply_button_style(
@@ -316,16 +337,7 @@ func _on_debug_world_enabled_changed(enabled: bool) -> void:
 	if _toggle_button != null:
 		_toggle_button.visible = not enabled
 	if enabled and _panel != null and _panel.visible:
-		_panel.visible = false
-		if _toggle_button != null:
-			_toggle_button.button_pressed = false
-			_toggle_button.text = "Developer [Show]"
-			PlacementUiStyles.apply_button_style(
-				_toggle_button,
-				PlacementUiStyles.COLOR_PANEL_ALT,
-				PlacementUiStyles.COLOR_BORDER,
-				PlacementUiStyles.COLOR_TEXT
-			)
+		_set_panel_open(false)
 	_update_debug_world_button_visual(enabled)
 
 func _update_debug_world_button_visual(enabled: bool) -> void:
@@ -498,7 +510,7 @@ func _get_brightness() -> float:
 
 func _set_brightness(value: float) -> void:
 	if _environment != null:
-		_environment.adjustment_enabled = true
+		_environment.adjustment_enabled = true		
 		_environment.adjustment_brightness = value
 		_queue_persistent_save()
 

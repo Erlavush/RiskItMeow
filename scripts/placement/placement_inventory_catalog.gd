@@ -6,6 +6,8 @@ const IMPORTED_FACTORY_TYPE := "imported_scene"
 
 const PlacementItemProfileOverrideStoreScript := preload("res://scripts/placement/placement_item_profile_override_store.gd")
 const IMPORTED_SCENE_PLACEABLE_SCRIPT_PATH := "res://scripts/placement/imported_scene_placeable.gd"
+const WOODEN_BLOCK_CLOCK_PLACEABLE_SCRIPT_PATH := "res://scripts/placement/wooden_block_clock_placeable.gd"
+const MACAWS_CEILING_FAN_PLACEABLE_SCRIPT_PATH := "res://scripts/placement/macaws_ceiling_fan_placeable.gd"
 
 const CATEGORY_ORDER := [
 	"Beds",
@@ -79,12 +81,28 @@ static func has_any_stock(item_defs: Array[Dictionary], item_stock: Dictionary) 
 static func uses_imported_scene_factory(item_def: Dictionary) -> bool:
 	return String(item_def.get("factory_type", "")) == IMPORTED_FACTORY_TYPE
 
+static func supports_studio_edit(item_def: Dictionary) -> bool:
+	return uses_imported_scene_factory(item_def) or bool(item_def.get("supports_studio_edit", false))
+
 static func create_imported_scene_instance(item_def: Dictionary):
 	var imported_script := load(IMPORTED_SCENE_PLACEABLE_SCRIPT_PATH) as Script
 	if imported_script == null:
 		push_warning("Could not load imported scene placeable script at %s" % IMPORTED_SCENE_PLACEABLE_SCRIPT_PATH)
 		return null
 	var placeable: Variant = imported_script.new()
+	if placeable != null and placeable.has_method("configure_from_item_def"):
+		placeable.configure_from_item_def(item_def)
+	return placeable
+
+static func create_item_instance(item_def: Dictionary):
+	if uses_imported_scene_factory(item_def):
+		return create_imported_scene_instance(item_def)
+
+	var item_script := get_item_script(item_def)
+	if item_script == null:
+		return null
+
+	var placeable: Variant = item_script.new()
 	if placeable != null and placeable.has_method("configure_from_item_def"):
 		placeable.configure_from_item_def(item_def)
 	return placeable
@@ -179,6 +197,42 @@ static func _build_live_item_defs(persisted_overrides: Dictionary = {}) -> Array
 			CURATED_INITIAL_OWNED,
 			persisted_overrides
 		),
+		_build_scripted_item_def(
+			"wooden_block_clock",
+			"Wooden Block Clock",
+			"Electronics",
+			WOODEN_BLOCK_CLOCK_PLACEABLE_SCRIPT_PATH,
+			{
+				"mount_kind": RoomConstants.MOUNT_WALL,
+				"supported_wall_surfaces": RoomConstants.WALL_SURFACES,
+				"visual_scale": Vector3.ONE,
+				"visual_y_offset": 0.0,
+				"visual_yaw": 0.0,
+				"preview_yaw": PI,
+				"collision_size": Vector3(1.0, 1.45, 0.5),
+				"collision_center_offset": Vector3(0.0, 0.725, 0.0),
+				"wall_half_extents": Vector2(0.5, 0.725),
+				"supports_studio_edit": true,
+			},
+			1,
+			persisted_overrides
+		),
+		_build_scripted_item_def(
+			"ceiling_fan",
+			"Ceiling Fan",
+			"Lights",
+			MACAWS_CEILING_FAN_PLACEABLE_SCRIPT_PATH,
+			{
+				"source_scene_path": "res://assets/props/macaws_lights/ceiling_fan/ceiling_fan.glb",
+				"mount_kind": RoomConstants.MOUNT_CEILING,
+				"anchor_mode": "ceiling",
+				"preview_yaw": PI * 0.25,
+				"fan_speed_degrees_per_second": 240.0,
+				"supports_studio_edit": true,
+			},
+			1,
+			persisted_overrides
+		),
 		_build_curated_imported_item_def(
 			"small_shelf",
 			"Small Shelf",
@@ -237,6 +291,37 @@ static func _build_curated_imported_item_def(item_id: String, display_name: Stri
 		"category": category,
 		"factory_type": IMPORTED_FACTORY_TYPE,
 		"source_scene_path": source_scene_path,
+		"mount_kind": primary_mount_kind,
+		"mount_kinds": [primary_mount_kind],
+		"placement_surface_kind": _get_runtime_surface_kind_for_mount_kind(primary_mount_kind),
+		"initial_owned": initial_owned,
+	}
+	for key_name in extra_values.keys():
+		item_def[key_name] = extra_values[key_name]
+
+	var raw_persisted_override: Variant = persisted_overrides.get(item_id, {})
+	if raw_persisted_override is Dictionary and not (raw_persisted_override as Dictionary).is_empty():
+		item_def.merge((raw_persisted_override as Dictionary).duplicate(true), true)
+
+	primary_mount_kind = get_primary_mount_kind(item_def)
+	item_def["mount_kind"] = primary_mount_kind
+	item_def["mount_kinds"] = _build_mount_kinds(item_def, primary_mount_kind)
+	item_def["placement_surface_kind"] = _get_runtime_surface_kind_for_mount_kind(primary_mount_kind)
+	if primary_mount_kind == RoomConstants.MOUNT_WALL and not item_def.has("supported_wall_surfaces"):
+		item_def["supported_wall_surfaces"] = RoomConstants.WALL_SURFACES
+	return item_def
+
+static func _build_scripted_item_def(item_id: String, display_name: String, category: String, script_path: String, extra_values: Dictionary = {}, initial_owned: int = CURATED_INITIAL_OWNED, persisted_overrides: Dictionary = {}) -> Dictionary:
+	var item_script := load(script_path) as Script
+	var primary_mount_kind := String(extra_values.get("mount_kind", RoomConstants.MOUNT_FLOOR))
+	if not RoomConstants.is_mount_kind(primary_mount_kind):
+		primary_mount_kind = RoomConstants.MOUNT_FLOOR
+
+	var item_def := {
+		"id": item_id,
+		"display_name": display_name,
+		"category": category,
+		"script": item_script,
 		"mount_kind": primary_mount_kind,
 		"mount_kinds": [primary_mount_kind],
 		"placement_surface_kind": _get_runtime_surface_kind_for_mount_kind(primary_mount_kind),

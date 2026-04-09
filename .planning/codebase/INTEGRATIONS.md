@@ -1,43 +1,46 @@
-# External Integrations
+# Integrations
 
-## APIs & External Services
-- No remote HTTP APIs, SaaS integrations, analytics SDKs, or third-party backends are present in this repository.
-- The project currently integrates only with built-in Godot engine services.
-- `scripts/skin_picker.gd` uses `FileDialog` to let the player pick a PNG from the local filesystem.
-- `scripts/MinecraftRig.gd` uses `ResourceLoader.exists()` and `load()` for engine-managed `res://` resources, plus `Image.load_from_file()` for arbitrary filesystem paths.
-- `scripts/dump_codebase.gd` integrates with Godot editor file APIs to export a text snapshot into `compiled_codebase.txt`.
+## Remote Services
+- No remote HTTP APIs, backend services, analytics SDKs, auth providers, or multiplayer services are integrated.
+- The repo contains no Firebase, web backend, shared-room, or online sync code.
+- All currently active integrations are local engine, file, and asset workflows.
 
-## Data Storage
-- Persistent project data is file-based and lives directly in repo assets such as `project.godot`, `scenes/*.tscn`, and `scripts/*.gd`.
-- There is no database, save-game layer, or cloud storage integration.
-- Runtime skin loading in `scripts/MinecraftRig.gd` reads a user-selected PNG directly from disk.
-- `scripts/dump_codebase.gd` writes a generated artifact to `compiled_codebase.txt`.
-- `generate_scene.py` can write `scenes/main.tscn` directly from outside the engine.
+## Local Persistence
+- Room layouts persist to `user://room_layout.json` through `scripts/placement/placement_room_layout_store.gd`.
+- Developer lighting and post-processing settings persist to `user://developer_environment_settings.cfg` through `scripts/debug/developer_environment_persistence.gd`.
+- Per-item tuning overrides persist to `user://placement_item_profile_overrides.cfg` through `scripts/placement/placement_item_profile_override_store.gd`.
+- These saves are local-only and are reloaded at startup by the placement manager, developer panel, and Item Studio.
 
-## Authentication & Identity
-- There is no authentication provider, user account system, or identity layer in the current codebase.
-- No OAuth, JWT, session, or platform sign-in code exists in `scripts/` or `project.godot`.
-- The only user-specific interaction is local file selection through `scripts/skin_picker.gd`.
+## Filesystem And Editor Integration
+- `scripts/skin_picker.gd` uses `FileDialog` and `Image.load_from_file()` so the player can choose a local `64x64` PNG skin.
+- `scripts/placement/placement_preview_cache.gd` reads and writes cached PNG previews under `assets/ui/item_previews/`.
+- `scripts/tools/generate_item_previews.gd` drives the preview generation pass by creating `PlacementItemPreview` scenes and saving PNG files.
+- `scripts/dump_codebase.gd` writes `compiled_codebase.txt` into the repo root.
+- `generate_scene.py` can overwrite `scenes/main.tscn`, although that script reflects an older scene layout.
 
-## Monitoring & Observability
-- There is no error reporting, telemetry, tracing, or log aggregation integration.
-- Runtime and tool feedback rely on lightweight local mechanisms such as `print()` in `scripts/WorldGenerator.gd` and `scripts/dump_codebase.gd`.
-- `scripts/MinecraftRig.gd` uses `push_warning()` for invalid skin inputs.
-- UI feedback is surfaced locally through `status_label` text in `scripts/skin_picker.gd`.
+## Engine-Level Asset Integration
+- Imported runtime props are loaded from `res://assets/props/...` by `scripts/placement/imported_scene_placeable.gd`.
+- `ImportedScenePlaceable` can instantiate `PackedScene` resources directly or rebuild `.gltf` / `.glb` content through `GLTFDocument` if needed.
+- `RoomFloorMaterials` and the placement UI load textures and fonts from `res://assets/textures/...` and `res://assets/ui/fonts/...`.
+- The player rig loads the default skin from `res://skin.png` and can replace it from a local filesystem path.
 
-## CI/CD & Deployment
-- No CI pipelines, build scripts, GitHub Actions, or deployment manifests are present in the repository.
-- No `export_presets.cfg` file exists, and `.gitignore` explicitly ignores it.
-- Deployment intent is documented in `ROADMAP.md`, but automated export/publish workflows are not implemented.
-- Git is the only visible release mechanism at this stage.
+## In-Process Communication
+- Cross-system coordination is handled through Godot node references and signals, not external messaging.
+- `PlacementManager` emits `room_layout_visuals_changed`, which is consumed by `RoomSunlightController`.
+- `DeveloperEnvironmentPanel` emits `environment_state_changed`, which is also consumed by `RoomSunlightController`.
+- `DebugWorldController` emits `debug_world_enabled_changed`, which is consumed by `DeveloperEnvironmentPanel`.
 
-## Environment Configuration
-- `project.godot` defines engine-level runtime configuration.
-- `.vscode/settings.json` stores a machine-local Godot executable path.
-- There are no `.env` files, secret stores, or environment-variable driven config paths in the repo.
-- Runtime resource loading is path-based using `res://` and user-selected filesystem paths.
+## Tooling And Execution
+- `LOCAL_TOOLING.md` documents the local Godot executables used for editor and console runs.
+- `scripts/tools/run_godot_headless.cmd` wraps headless Godot execution and redirects writable user-data folders into `.godot_user/`.
+- `.vscode/settings.json` stores the machine-local Godot executable path for the editor extension.
+- There is no CI pipeline, build server, or deployment automation in the repo.
 
-## Webhooks & Callbacks
-- There are no outbound webhooks, inbound callbacks, or background job endpoints in this codebase.
-- Signal wiring is local in-process Godot signal usage, for example button `pressed` connections in `scripts/skin_picker.gd`.
-- Callback-style flows are limited to engine events like `_ready()`, `_physics_process()`, `_process()`, `_unhandled_input()`, and file dialog signals.
+## Third-Party Assets
+- `THIRD_PARTY_ASSET_SOURCES.txt` tracks the live curated asset sources that still feed the runtime catalog.
+- The repo depends on Sketchfab-sourced furniture/window assets and the Titillium Web font.
+- Metadata is incomplete for `assets/props/small_shelf` and `assets/props/window`, so those assets are integration/documentation risks.
+
+## Secrets And Environment
+- There are no `.env` files, API keys, or secret-management systems in the repository.
+- Configuration is path-based and file-based through `project.godot`, scene resources, and the local `user://` save files.

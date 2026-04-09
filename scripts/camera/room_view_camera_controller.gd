@@ -25,6 +25,7 @@ var _pitch_velocity: float = 0.0
 var _current_distance: float = 0.0
 var _target_distance: float = 0.0
 var _drag_button: MouseButton = MOUSE_BUTTON_NONE
+const ORBIT_DRAG_BUTTON: MouseButton = MOUSE_BUTTON_LEFT
 
 @onready var camera: Camera3D = $Camera3D
 
@@ -73,7 +74,7 @@ func handle_input_event(event: InputEvent) -> bool:
 				if mouse_button.pressed:
 					_apply_zoom_delta(1.0, absf(mouse_button.factor))
 					return true
-			MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT:
+			ORBIT_DRAG_BUTTON:
 				if mouse_button.pressed:
 					if get_viewport().gui_get_hovered_control() != null:
 						return false
@@ -84,9 +85,7 @@ func handle_input_event(event: InputEvent) -> bool:
 					return true
 		return false
 
-	if event is InputEventMouseMotion and (
-		_drag_button == MOUSE_BUTTON_MIDDLE or _drag_button == MOUSE_BUTTON_RIGHT
-	):
+	if event is InputEventMouseMotion and _drag_button == ORBIT_DRAG_BUTTON:
 		var motion := event as InputEventMouseMotion
 		var yaw_delta: float = -motion.relative.x * orbit_sensitivity
 		var pitch_delta: float = motion.relative.y * orbit_sensitivity

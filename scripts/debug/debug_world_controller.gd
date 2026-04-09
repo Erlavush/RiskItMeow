@@ -239,6 +239,8 @@ func _is_debug_world_toggle_key(key_event: InputEventKey) -> bool:
 		return false
 	return key_event.keycode == KEY_KP_7 \
 		or key_event.physical_keycode == KEY_KP_7 \
+		or key_event.keycode == KEY_F7 \
+		or key_event.physical_keycode == KEY_F7 \
 		or key_event.keycode == KEY_HOME \
 		or key_event.physical_keycode == KEY_HOME
 
@@ -278,24 +280,25 @@ func _unhandled_input(event: InputEvent) -> void:
 				_orbit_distance = clampf(_orbit_distance + CAMERA_ZOOM_STEP, CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)
 				get_viewport().set_input_as_handled()
 			return
-		if mouse_button.button_index == MOUSE_BUTTON_RIGHT:
-			if mouse_button.pressed and not _is_pointer_over_ui() and not _gizmo_drag_active:
-				_orbit_drag_active = true
-				_orbit_drag_start_mouse = mouse_button.position
-				get_viewport().set_input_as_handled()
-			else:
-				_orbit_drag_active = false
-			return
 		if mouse_button.button_index == MOUSE_BUTTON_LEFT:
 			if mouse_button.pressed:
-				if _studio_mode == STUDIO_MODE_EDIT and not _is_pointer_over_ui():
-					var handle_id = _pick_gizmo_handle(mouse_button.position)
-					if not handle_id.is_empty():
-						_begin_gizmo_drag(handle_id, mouse_button.position)
-						get_viewport().set_input_as_handled()
+				if not _is_pointer_over_ui():
+					if _studio_mode == STUDIO_MODE_EDIT:
+						var handle_id = _pick_gizmo_handle(mouse_button.position)
+						if not handle_id.is_empty():
+							_begin_gizmo_drag(handle_id, mouse_button.position)
+							get_viewport().set_input_as_handled()
+							return
+					_orbit_drag_active = true
+					_orbit_drag_start_mouse = mouse_button.position
+					get_viewport().set_input_as_handled()
 				return
 			if _gizmo_drag_active:
 				_end_gizmo_drag()
+				get_viewport().set_input_as_handled()
+				return
+			if _orbit_drag_active:
+				_orbit_drag_active = false
 				get_viewport().set_input_as_handled()
 			return
 
@@ -918,12 +921,7 @@ func _position_current_item() -> void:
 			_current_item.position = Vector3.ZERO
 
 func _create_item_instance(item_def: Dictionary) -> SimpleWoodChair:
-	if PlacementInventoryCatalog.uses_imported_scene_factory(item_def):
-		return PlacementInventoryCatalog.create_imported_scene_instance(item_def) as SimpleWoodChair
-	var script_ref = PlacementInventoryCatalog.get_item_script(item_def)
-	if script_ref == null:
-		return null
-	return script_ref.new() as SimpleWoodChair
+	return PlacementInventoryCatalog.create_item_instance(item_def) as SimpleWoodChair
 
 func _build_current_item_overlays() -> void:
 	if _current_item == null:
@@ -1416,6 +1414,10 @@ func _update_summary() -> void:
 	var category = String(_current_item_def.get("category", "Miscellaneous"))
 	var mount_text = PlacementInventoryCatalog.get_mount_badge_text(_current_item_def)
 	var source_path = String(_current_item_def.get("source_scene_path", ""))
+	if source_path.is_empty():
+		var script_ref := PlacementInventoryCatalog.get_item_script(_current_item_def)
+		if script_ref != null:
+			source_path = script_ref.resource_path
 	var saved_override = PlacementItemProfileOverrideStoreScript.has_override(item_id)
 	var support_surfaces = 0
 	if _current_item != null:
@@ -1440,7 +1442,7 @@ func _update_status() -> void:
 
 func _update_button_states() -> void:
 	var has_item = not _current_item_def.is_empty()
-	var can_edit = has_item and PlacementInventoryCatalog.uses_imported_scene_factory(_current_item_def)
+	var can_edit = has_item and PlacementInventoryCatalog.supports_studio_edit(_current_item_def)
 	if _previous_item_button != null:
 		_previous_item_button.disabled = _filtered_item_defs.size() <= 1
 	if _next_item_button != null:

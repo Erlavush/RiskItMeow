@@ -1,50 +1,47 @@
 # Architecture
 
 ## Pattern Overview
-- The project follows a scene-centric Godot architecture where `project.godot` boots `scenes/main.tscn`, and that world scene instances `scenes/player.tscn`.
-- Behavior is attached to nodes through per-scene scripts rather than a service layer or ECS.
-- Most game logic is concentrated in three runtime scripts: `scripts/player.gd`, `scripts/MinecraftRig.gd`, and `scripts/skin_picker.gd`.
-- Tooling concerns are separated into editor/helper scripts such as `scripts/WorldGenerator.gd`, `scripts/dump_codebase.gd`, and `generate_scene.py`.
+- The project is a scene-centric Godot application with behavior attached directly to nodes rather than a service layer or ECS.
+- `project.godot` boots `scenes/main.tscn`, and that scene wires the active runtime graph together in one place.
+- Most runtime complexity is concentrated in a few large controller scripts: `scripts/placement/placement_manager.gd`, `scripts/debug/debug_world_controller.gd`, `scripts/debug/developer_environment_panel.gd`, `scripts/player.gd`, and `scripts/room/room_shell.gd`.
+- Shared data is mostly passed through node references, exported `NodePath`s, signals, and static helper classes.
 
-## Layers
-- Configuration layer: `project.godot`, `.gitignore`, `.gitattributes`, and `.vscode/settings.json`.
-- World composition layer: `scenes/main.tscn` defines the world root, environment, lighting, ground, and instanced player.
-- Player controller layer: `scripts/player.gd` handles input, camera mode switching, movement, and UI spawning.
-- Character presentation layer: `scripts/MinecraftRig.gd` procedurally builds and animates a Minecraft-style character rig.
-- UI layer: `scripts/skin_picker.gd` creates a small in-game toolbar for skin, model, and camera actions.
-- Tooling/export layer: `scripts/WorldGenerator.gd`, `scripts/dump_codebase.gd`, and `generate_scene.py`.
+## Main World Composition
+- `scenes/main.tscn` creates the environment, directional light, room shell, orbit camera controller, placement manager, cutaway controller, sunlight controller, debug world controller, developer panel, and player instance.
+- `scenes/player.tscn` packages the `CharacterBody3D`, Minecraft rig, third-person camera rig, and first-person camera.
+- `scenes/room/room_shell.tscn` provides the shell node hierarchy for the floor, four walls, and ceiling, while `scripts/room/room_shell.gd` procedurally resizes and reconfigures them at runtime.
+
+## Runtime Layers
+- Player layer: `scripts/player.gd`, `scripts/MinecraftRig.gd`, `scripts/skin_picker.gd`, and `scripts/minecraft_rig/*.gd`.
+- Room layer: `scripts/room/room_shell.gd`, `scripts/room/room_wall_segments.gd`, `scripts/room/room_floor_materials.gd`, `scripts/room/room_cutaway_controller.gd`, and `scripts/room/room_sunlight_controller.gd`.
+- Placement layer: `scripts/placement/placement_manager.gd` plus catalog, validation, surface-query, preview, save-store, and UI helper scripts.
+- Debug/tuning layer: `scripts/debug/developer_environment_panel.gd`, `scripts/debug/developer_environment_state.gd`, and `scripts/debug/debug_world_controller.gd`.
+- Tooling layer: `scripts/tools/generate_item_previews.gd`, `scripts/dump_codebase.gd`, `scripts/WorldGenerator.gd`, and `generate_scene.py`.
 
 ## Data Flow
 - Startup begins in `project.godot`, which loads `scenes/main.tscn`.
-- `scenes/main.tscn` instances `scenes/player.tscn`, giving the world a single playable character.
-- `scripts/player.gd::_ready()` captures the mouse, initializes camera state, excludes the player from spring-arm collision, and spawns the `SkinPicker` UI.
-- Player input is polled every physics frame in `scripts/player.gd`, then translated into movement and camera behavior.
-- `scripts/MinecraftRig.gd::_process()` reads the parent node's `velocity` property to derive walk and idle animation.
-- `scripts/skin_picker.gd` drives two-way interactions by calling player methods such as `cycle_camera_mode()` and rig methods such as `load_skin_from_file()`.
+- `PlacementManager` builds the curated item catalog through `PlacementInventoryCatalog.build_item_defs()`, loads local room state, and owns the build/edit browser UI.
+- When the user starts placement, `PlacementManager` creates a `SimpleWoodChair`-compatible placeable, updates the preview from camera raycasts, validates it through `PlacementValidator`, and commits it into `PlacedItems`.
+- Saved room layout data flows through `PlacementRoomLayoutStore`, which serializes world-anchored and support-surface-attached props into `user://room_layout.json`.
+- `RoomCutawayController` and `RoomSunlightController` react to camera position and placed windows to keep the room readable and lit.
+- `DebugWorldController` reuses the same placement catalog and imported-item pipeline to preview one item at a time and write per-item override data back into `user://placement_item_profile_overrides.cfg`.
+- `DeveloperEnvironmentPanel` captures, applies, and persists environment/light settings, then notifies `RoomSunlightController` so interior portal lighting can resync.
 
 ## Key Abstractions
-- `CharacterBody3D` in `scenes/player.tscn` is the player movement root, scripted by `scripts/player.gd`.
-- `MinecraftRig` is a reusable rig builder declared with `class_name MinecraftRig` in `scripts/MinecraftRig.gd`.
-- `SkinPicker` is a reusable UI layer declared with `class_name SkinPicker` in `scripts/skin_picker.gd`.
-- `WorldGenerator` is an editor utility node that can populate block ground with `CSGBox3D` children.
-- `dump_codebase.gd` is an `EditorScript` that exports a compressed textual representation of the project for AI tooling.
+- `RoomShell` is the geometry authority for room extents, wall positions, floor/ceiling heights, wall openings, and cutaway state.
+- `SimpleWoodChair` is the base placeable actor contract for collision, visuals, preview rendering, mounting rules, and support surfaces.
+- `ImportedScenePlaceable` extends that base contract to support imported `.gltf` / `.glb` assets, auto-fit metrics, and per-item overrides.
+- `PlacementInventoryCatalog` is the single source of truth for the live curated catalog.
+- `PlacementManager` is both the runtime placement state machine and the browser UI owner.
+- `DebugWorldController` is effectively a separate in-game Item Studio that shares the placement catalog rather than a standalone editor plugin.
+
+## Editor And Runtime Split
+- Many scripts are marked `@tool`, so the same file can run in the editor and at runtime.
+- `RoomShell`, `PlacementManager`, `ImportedScenePlaceable`, `DeveloperEnvironmentPanel`, `RoomSunlightController`, `MinecraftRig`, and `PlacementBrowserCard` all have editor-aware behavior.
+- This gives fast iteration inside the editor but increases the risk of editor-side side effects and mixed responsibilities inside a single file.
 
 ## Entry Points
 - Engine entry point: `project.godot`.
-- Main world scene: `scenes/main.tscn`.
-- Player runtime entry points: `_ready()`, `_physics_process()`, `_unhandled_input()`, and `set_camera_mode()` in `scripts/player.gd`.
-- Rig runtime entry points: `_ready()`, `_rebuild()`, and `_process()` in `scripts/MinecraftRig.gd`.
-- UI entry points: `_ready()` and button/file-dialog callbacks in `scripts/skin_picker.gd`.
-- Editor entry points: exported setters in `scripts/WorldGenerator.gd` and `_run()` in `scripts/dump_codebase.gd`.
-
-## Error Handling
-- Error handling is defensive and local rather than centralized.
-- Scripts use guard clauses heavily, for example null checks in `scripts/skin_picker.gd` and `_pose_ready` checks in `scripts/MinecraftRig.gd`.
-- Asset load failures fall back to warnings plus a generated placeholder skin in `scripts/MinecraftRig.gd`.
-- There is no shared error bus, exception wrapper, or retry framework.
-
-## Cross-Cutting Concerns
-- The target platform influences architecture: `ROADMAP.md` and `project.godot` optimize toward browser-friendly rendering with `gl_compatibility`.
-- Input handling is cross-cutting but currently hardcoded to desktop keys in `scripts/player.gd`.
-- Editor and runtime logic coexist in `scripts/`, so `@tool` boundaries matter when touching shared files.
-- The repo contains both source-of-truth runtime files and generated artifacts such as `compiled_codebase.txt` and `.godot/` cache data.
+- Runtime scene entry point: `scenes/main.tscn`.
+- Main gameplay callbacks: `_ready()`, `_physics_process()`, `_process()`, `_input()`, and `_unhandled_input()` across `scripts/player.gd`, `scripts/placement/placement_manager.gd`, and `scripts/debug/debug_world_controller.gd`.
+- Tooling entry points: `_run()` in `scripts/tools/generate_item_previews.gd`, `_run()` in `scripts/dump_codebase.gd`, the exported setter in `scripts/WorldGenerator.gd`, and the direct file write in `generate_scene.py`.

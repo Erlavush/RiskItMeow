@@ -1,52 +1,43 @@
-# Coding Conventions
+# Conventions
 
-## Naming Patterns
-- Functions and local variables are written in snake_case, for example `_spawn_ui()`, `_queue_rebuild()`, and `smoothed_camera_distance`.
-- Constants use uppercase snake case, for example `THIRD_PERSON_DISTANCE` in `scripts/player.gd`.
-- Enums use PascalCase type names with uppercase members, for example `CameraMode.FREECAM` and `SkinModel.CLASSIC`.
-- Reusable script classes use `class_name` in PascalCase, for example `MinecraftRig` and `SkinPicker`.
-- File naming is not fully uniform across the repo; new files should ideally pick one clear convention and stay consistent within a subsystem.
+## Naming
+- GDScript functions, locals, and most members use snake_case, for example `_apply_cutaway_state()`, `_sync_window_sunlight()`, and `_build_live_item_defs()`.
+- Constants use uppercase snake case, for example `FAST_SPEED`, `WINDOW_ITEM_IDS`, and `CURATED_INITIAL_OWNED`.
+- Reusable script classes use `class_name` in PascalCase, for example `RoomShell`, `PlacementManager`, `ImportedScenePlaceable`, and `DebugWorldController`.
+- File naming is mostly snake_case, with notable PascalCase exceptions such as `scripts/MinecraftRig.gd` and `scripts/WorldGenerator.gd`.
 
-## Code Style
-- Scripts favor typed GDScript for exported fields, constants, parameters, and many locals.
-- Early returns are common for guard-style flow control, especially in `scripts/MinecraftRig.gd` and `scripts/skin_picker.gd`.
-- Large behaviors are split into focused helper methods such as `_update_freecam()`, `_update_follow_movement()`, and `_sync_follow_camera_rig()` in `scripts/player.gd`.
-- `@onready` is used for scene node references in `scripts/player.gd`.
-- Small explanatory comments appear near engine-specific or non-obvious behavior, but most code is self-describing.
+## Script Layout
+- Files usually follow the Godot style of `@tool` / `class_name` / `extends`, then constants, exports, member variables, `@onready` refs, and finally lifecycle plus helper methods.
+- Strong typing is used heavily for exported properties, constants, arrays, dictionaries, and return values.
+- Godot path references are usually explicit `res://...` strings or `preload()` constants.
+- Editor-aware files typically branch early on `Engine.is_editor_hint()`.
 
-## Import Organization
-- Godot scripts rely on `extends`, `class_name`, `@tool`, `@export`, `@onready`, and `preload()` rather than language-level imports.
-- Resource references are usually explicit `res://` paths, for example `preload("res://scripts/skin_picker.gd")` and `load("res://skin.png")`.
-- Built-in engine types are used directly without wrapper modules or facades.
-- Script layout usually follows this order: type declarations, constants, vars, onready refs, then lifecycle/helper methods.
+## Control Flow
+- Guard clauses are the dominant error-handling pattern; missing node refs or invalid state usually short-circuit with `return`.
+- Large controller scripts decompose behavior into many private helpers instead of nested mega-functions, even when the file itself remains large.
+- Dynamic calls such as `call()` and `has_method()` are used when subsystems want loose coupling across node boundaries.
+- Signals are used for cross-system updates where a direct call would be too tightly coupled, especially between placement, developer lighting, and debug systems.
 
-## Error Handling
-- Error handling is pragmatic and localized.
-- Invalid inputs often short-circuit silently with `return`, especially when required nodes are missing.
-- Asset validation uses `push_warning()` for recoverable issues in `scripts/MinecraftRig.gd`.
-- Fallback behavior is preferred over hard failure, for example `_make_fallback_skin()` when a skin cannot be loaded.
-- There is no shared error abstraction, structured result type, or logging service.
+## Scene And UI Patterns
+- Runtime UI is built mostly in code rather than authored in `.tscn` UI scenes.
+- Placement browser cards, the developer panel, the player-tools panel, and the debug Item Studio all construct `Control` trees procedurally.
+- Node-path exports are the standard dependency-injection mechanism between scene-local controllers.
+- Metadata on runtime placeables is used as lightweight state storage for values like `item_id`, `placement_surface`, and `host_surface_id`.
 
-## Logging
-- Logging is intentionally light.
-- Editor helpers use `print()` for visible confirmation, for example `scripts/WorldGenerator.gd` and `scripts/dump_codebase.gd`.
-- Runtime status is often shown in UI text rather than console logs, for example `status_label.text` updates in `scripts/skin_picker.gd`.
-- There is no log level system or remote logging backend.
+## Data Patterns
+- Static `RefCounted` helper classes are used for catalog data, save/load helpers, validation, UI styling, and surface-query math.
+- Item definitions are dictionaries built by `PlacementInventoryCatalog`, then merged with local override dictionaries from `PlacementItemProfileOverrideStore`.
+- Room saves serialize to plain dictionaries and JSON through `PlacementRoomLayoutStore`.
+- Persistent developer settings serialize to `ConfigFile` data rather than JSON.
 
-## Comments
-- Comments are sparse and usually justify engine quirks or editor behavior.
-- The best examples are in `scripts/WorldGenerator.gd` and `scripts/MinecraftRig.gd`, where comments explain why owner assignment or mixed loading paths are necessary.
-- Most naming is descriptive enough that extra commentary is avoided.
+## Error Handling And Logging
+- Warnings use `push_warning()` for recoverable issues such as invalid assets or save/load problems.
+- Runtime user feedback is often shown in labels/buttons instead of being printed to the console.
+- There is no shared logger, error bus, or structured result type used across subsystems.
+- Fallback rendering paths exist in `SimpleWoodChair` and `MinecraftRig` when imported visuals or user-selected skins fail.
 
-## Function Design
-- Functions are usually small and single-purpose, especially in `scripts/player.gd`.
-- Setter-driven side effects are common in tool scripts, for example exported properties that call `_queue_rebuild()` or `_generate_ground()`.
-- Helper methods encapsulate repeated state sync logic, such as `_apply_outer_visibility()` and `_cache_rest_pose()`.
-- Dynamic calls are used in a few places, for example `player_node.call("cycle_camera_mode")`, which trades type safety for loose coupling.
-
-## Module Design
-- Each script owns one primary responsibility tied to a scene node or tool role.
-- `scripts/player.gd` owns movement and camera behavior.
-- `scripts/MinecraftRig.gd` owns procedural geometry, materials, UV mapping, and animation.
-- `scripts/skin_picker.gd` owns runtime UI concerns.
-- `scripts/WorldGenerator.gd` and `scripts/dump_codebase.gd` are support tools rather than gameplay modules.
+## Practical Style Boundaries
+- `@tool` is common, so new changes should respect editor/runtime dual execution.
+- The repo favors direct key polling and shortcut checks over `InputMap` actions in the currently active gameplay and tool controllers.
+- Encapsulation is pragmatic rather than strict; some systems reach into other controllers’ internal state when convenient.
+- New work should preserve the current manual-feature baseline rather than trying to restore older source-porting abstractions.

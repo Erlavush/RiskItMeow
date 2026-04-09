@@ -5,7 +5,7 @@ extends Node
 @export var room_camera_controller_path: NodePath
 @export var placement_manager_path: NodePath
 @export var player_path: NodePath
-@export_range(0.2, 0.98, 0.01) var roof_show_dot_threshold: float = 0.86
+@export_range(0.2, 0.98, 0.01) var roof_show_dot_threshold: float = 0.26
 @export var enable_cutaway := true
 
 var _room_shell: RoomShell
@@ -68,10 +68,12 @@ func _apply_cutaway_state(force: bool = false) -> void:
 
 	var room_center := _room_shell.get_room_center()
 	var to_room := (room_center - camera.global_position).normalized()
-	var next_roof_cutaway := absf(to_room.y) < roof_show_dot_threshold
+	var next_roof_cutaway := absf(to_room.y) > roof_show_dot_threshold
 	if force or _last_roof_cutaway != next_roof_cutaway:
 		_last_roof_cutaway = next_roof_cutaway
 		_room_shell.set_surface_cutaway(RoomConstants.CEILING_SURFACE, next_roof_cutaway)
+		if _placement_manager != null:
+			_placement_manager.set_ceiling_surface_cutaway(next_roof_cutaway)
 
 func _clear_cutaway_state() -> void:
 	var needs_clear := _last_roof_cutaway
@@ -90,6 +92,8 @@ func _clear_cutaway_state() -> void:
 
 	_last_roof_cutaway = false
 	_room_shell.set_surface_cutaway(RoomConstants.CEILING_SURFACE, false)
+	if _placement_manager != null:
+		_placement_manager.set_ceiling_surface_cutaway(false)
 
 func _get_active_camera() -> Camera3D:
 	if _player != null and _player.has_method("get_active_camera"):

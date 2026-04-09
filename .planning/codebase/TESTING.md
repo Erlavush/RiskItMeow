@@ -1,49 +1,40 @@
-# Testing Patterns
+# Testing
 
-## Test Framework
-- No automated test framework is currently configured in this repository.
-- There are no `tests/` directories, Gut addons, WAT addons, or CI test runners.
-- No headless test harness scripts are committed in the project itself.
-- Validation today appears to depend on manual runs in the Godot editor/runtime.
+## Current State
+- No automated test framework is configured in the repository.
+- There is no `tests/` directory, no Gut/WAT addon, and no CI runner executing gameplay or editor tests.
+- Validation is currently done through manual playtesting and a small set of headless smoke-test commands.
 
-## Test File Organization
-- There are no dedicated test files or fixture directories.
-- The closest thing to support tooling is `scripts/dump_codebase.gd`, which exports the project for AI review, and `generate_scene.py`, which can rewrite `scenes/main.tscn`.
-- Runtime scenes such as `scenes/main.tscn` and `scenes/player.tscn` currently act as manual smoke-test surfaces.
-- Root docs like `GODOT_QUIRKS.md` capture known engine pitfalls but are not executable tests.
+## Existing Smoke-Test Commands
+- Headless runtime boot: `scripts/tools/run_godot_headless.cmd --headless --path "Z:\RiskItMeow\risk-it-meow" --quit-after 1`
+- Headless editor scan: `scripts/tools/run_godot_headless.cmd --headless --editor --path "Z:\RiskItMeow\risk-it-meow" --quit-after 1`
+- Preview regeneration: `Z:\Godot_v4.6.1-stable_win64.exe\Godot_v4.6.1-stable_win64_console.exe --path Z:\RiskItMeow\risk-it-meow --script res://scripts/tools/generate_item_previews.gd`
+- The headless runtime boot currently exits cleanly.
+- The headless editor scan currently initializes and exits successfully, with the usual scan-thread-aborted warning caused by the forced immediate quit.
 
-## Test Structure
-- The natural manual smoke test is to open `scenes/main.tscn` through `project.godot` and verify the player loads, camera modes cycle, and movement works.
-- Camera behavior in `scripts/player.gd` should be exercised across freecam, third-person, and first-person modes.
-- Rig behavior in `scripts/MinecraftRig.gd` should be checked for rebuild correctness, texture loading, and animation response to movement velocity.
-- UI behavior in `scripts/skin_picker.gd` should be checked for button wiring, file dialog flow, and status-label updates.
-- Tool scripts such as `scripts/WorldGenerator.gd` and `scripts/dump_codebase.gd` need editor-side validation rather than gameplay validation.
+## Manual Validation Surfaces
+- `scenes/main.tscn` is the primary end-to-end runtime smoke-test surface.
+- Placement workflows should be validated in both Build and Edit modes, including save/load, duplicate/delete, and preview validity states.
+- Window placement should be validated together with wall cutouts and the `RoomSunlightController`.
+- The player should be validated in both room-view and first-person camera modes.
+- The developer panel and debug Item Studio should be validated because both mutate persisted local state and cross-system behavior.
 
-## Mocking
-- No mocking or stubbing patterns are present.
-- Dependencies are mostly engine APIs and scene nodes, so current code directly calls into Godot runtime objects.
-- Dynamic calls like `call()` and `get()` in `scripts/skin_picker.gd` and `scripts/MinecraftRig.gd` would need seams before traditional mocking becomes practical.
+## High-Risk Untested Areas
+- `scripts/placement/placement_manager.gd` has no automated coverage despite being the largest runtime controller.
+- `scripts/debug/debug_world_controller.gd` has no automated coverage despite its size and editor-like responsibilities.
+- `scripts/placement/imported_scene_placeable.gd` has no automated checks for auto-fit metrics, bounds extraction, or GLTF fallback loading.
+- `scripts/room/room_shell.gd`, `scripts/room/room_cutaway_controller.gd`, and `scripts/room/room_sunlight_controller.gd` have no regression coverage for room visibility rules.
+- `scripts/player.gd` camera-mode transitions and direct-key movement handling are untested.
 
-## Fixtures and Factories
-- `scenes/player.tscn` is the main reusable runtime fixture because it packages player body, rig, collision, and camera.
-- `skin.png` is the default asset fixture for the rig system.
-- `scenes/main.tscn` is the top-level integration fixture for world, ground, lighting, and player instancing.
-- `compiled_codebase.txt` is a generated artifact for review workflows, not a runtime fixture.
+## What Counts As Useful Future Tests
+- Headless scene boot tests for `project.godot` and `scenes/main.tscn`.
+- Pure-logic tests for `PlacementSurfaceQueries`, `PlacementValidator`, and room-layout serialization helpers.
+- Regression tests for imported-item profile overrides and room save/load round-trips.
+- Focused interaction tests for cutaway state, wall openings, and window-driven sunlight updates.
+- Tooling checks that regenerate item previews and verify expected output files under `assets/ui/item_previews/`.
 
-## Coverage
-- There is no code coverage tooling or baseline.
-- Movement, camera collision handling, filesystem skin import, and procedural mesh generation have zero automated coverage.
-- Tool-script behaviors also have no regression coverage.
-- The roadmap in `ROADMAP.md` is ahead of implemented safety nets.
-
-## Test Types
-- Current practical test types are manual runtime smoke tests and manual editor tool checks.
-- Integration testing should focus first on `project.godot` boot, `scenes/main.tscn`, and the interaction between `scripts/player.gd`, `scripts/MinecraftRig.gd`, and `scripts/skin_picker.gd`.
-- Future unit-like tests would need to isolate math helpers, UV mapping helpers, and camera state transitions.
-- Future export tests should cover browser/mobile constraints because the project target is web-focused.
-
-## Common Patterns
-- There is no established automated test pattern yet.
-- The repo instead documents operational knowledge in `GODOT_QUIRKS.md` and `GDSCRIPT_EXPERTISE.md`.
-- Manual verification is likely happening inside the editor with immediate visual confirmation and console warnings.
-- Adding tests will require introducing a framework, deciding whether to test in-editor or headless, and separating pure logic from scene-bound code.
+## Missing Infrastructure
+- No CI pipeline exists to run even the current smoke-test commands automatically.
+- No golden scenes or fixtures are defined beyond the live runtime scenes themselves.
+- No coverage tooling is present.
+- No test-only seams have been introduced for the larger node-heavy controllers, so future automation will require some refactoring.

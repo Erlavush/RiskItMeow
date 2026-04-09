@@ -142,6 +142,7 @@ var _wall_surface_cutaway_states: Dictionary = {
 	RoomConstants.WALL_FRONT: false,
 	RoomConstants.WALL_RIGHT: false,
 }
+var _ceiling_surface_cutaway := false
 
 func _ready() -> void:
 	_room_shell = get_node_or_null(room_shell_path) as RoomShell
@@ -226,9 +227,6 @@ func _input(event: InputEvent) -> void:
 				"move", "axis_x", "axis_z", "rotate":
 					_begin_drag(target, mouse_button.position)
 					get_viewport().set_input_as_handled()
-				"floor", "surface":
-					_update_preview_from_mouse(true)
-					get_viewport().set_input_as_handled()
 			return
 
 		if _drag_mode != "":
@@ -304,6 +302,33 @@ func _handle_runtime_shortcuts(key_event: InputEventKey) -> bool:
 			return true
 		_:
 			return false
+
+func blocks_room_camera_input(event: InputEvent) -> bool:
+	if event == null or _debug_world_active:
+		return false
+
+	if _placement_active:
+		if _drag_mode != "":
+			if event is InputEventMouseButton:
+				var drag_mouse_button := event as InputEventMouseButton
+				return drag_mouse_button.button_index == MOUSE_BUTTON_LEFT
+			return event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+
+		if event is InputEventMouseButton:
+			var mouse_button := event as InputEventMouseButton
+			return mouse_button.button_index == MOUSE_BUTTON_LEFT \
+				and mouse_button.pressed \
+				and _has_camera_conflicting_placement_target(mouse_button.position)
+		return false
+
+	if _is_edit_mode() and not _placement_active and event is InputEventMouseButton:
+		var mouse_button := event as InputEventMouseButton
+		return mouse_button.button_index == MOUSE_BUTTON_LEFT \
+			and mouse_button.pressed \
+			and mouse_button.double_click \
+			and not _is_pointer_over_placement_ui()
+
+	return false
 
 func _activate_browser_shortcut(next_editor_mode: String, next_browser_mode: String) -> void:
 	_cancel_current_placement()
@@ -1259,10 +1284,16 @@ func set_wall_surface_cutaway(surface_name: String, is_cutaway: bool) -> void:
 	_wall_surface_cutaway_states[surface_name] = bool(is_cutaway)
 	_apply_cutaway_to_surface(surface_name)
 
+func set_ceiling_surface_cutaway(is_cutaway: bool) -> void:
+	_ceiling_surface_cutaway = bool(is_cutaway)
+	_apply_cutaway_to_surface(RoomConstants.CEILING_SURFACE)
+
 func clear_wall_surface_cutaways() -> void:
 	for surface_name in _wall_surface_cutaway_states.keys():
 		_wall_surface_cutaway_states[surface_name] = false
 		_apply_cutaway_to_surface(String(surface_name))
+	_ceiling_surface_cutaway = false
+	_apply_cutaway_to_surface(RoomConstants.CEILING_SURFACE)
 
 func _apply_cutaway_to_surface(_surface_name: String) -> void:
 	if _placed_items_root == null:
@@ -1307,12 +1338,7 @@ func _create_item_instance(item_id: String) -> SimpleWoodChair:
 	var item_def: Dictionary = _get_item_definition(item_id)
 	if item_def.is_empty():
 		return null
-	if PlacementInventoryCatalog.uses_imported_scene_factory(item_def):
-		return PlacementInventoryCatalog.create_imported_scene_instance(item_def)
-	var item_script: Script = _get_item_script(item_def)
-	if item_script == null:
-		return null
-	return item_script.new() as SimpleWoodChair
+	return PlacementInventoryCatalog.create_item_instance(item_def) as SimpleWoodChair
 
 func _create_item_instance_from_definition(item_def: Dictionary) -> SimpleWoodChair:
 	if item_def.is_empty():
@@ -2071,31 +2097,31 @@ func _update_status_text() -> void:
 			match _placement_session:
 				PLACEMENT_SESSION_EDIT:
 					if _active_preview_is_wall_placeable():
-						_status_label.text = "Editing %s on the wall.\nDrag across the wall to move it. Duplicate and Delete are available while editing." % _get_active_item_display_name()
+						_status_label.text = "Editing %s on the wall.\nDrag the item itself to move it across the wall. Duplicate and Delete are available while editing." % _get_active_item_display_name()
 					elif _active_preview_is_ceiling_placeable():
-						_status_label.text = "Editing %s on the ceiling.\nDrag across the ceiling grid, use the gizmo, or rotate with Q/E." % _get_active_item_display_name()
+						_status_label.text = "Editing %s on the ceiling.\nDrag the item itself, use the gizmo, or rotate with Q/E." % _get_active_item_display_name()
 					elif _active_preview_is_support_surface_placeable():
-						_status_label.text = "Editing %s on a furniture surface.\nDrag across a table, shelf, or cabinet top, then rotate with Q/E if needed." % _get_active_item_display_name()
+						_status_label.text = "Editing %s on a furniture surface.\nDrag the item itself across the surface, then rotate with Q/E if needed." % _get_active_item_display_name()
 					else:
-						_status_label.text = "Editing %s.\nDrag, use the gizmo, or click another cell. Duplicate and Delete are available while editing." % _get_active_item_display_name()
+						_status_label.text = "Editing %s.\nDrag the item itself, use the gizmo, or orbit with left-drag on empty space. Duplicate and Delete are available while editing." % _get_active_item_display_name()
 				PLACEMENT_SESSION_DUPLICATE:
 					if _active_preview_is_wall_placeable():
-						_status_label.text = "Ready to place a duplicate of %s.\nMove it to a new wall cell, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new wall spot, then confirm to keep both copies." % _get_active_item_display_name()
 					elif _active_preview_is_ceiling_placeable():
-						_status_label.text = "Ready to place a duplicate of %s.\nMove it to a new ceiling cell, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new ceiling spot, then confirm to keep both copies." % _get_active_item_display_name()
 					elif _active_preview_is_support_surface_placeable():
-						_status_label.text = "Ready to place a duplicate of %s.\nMove it to a new spot on a table, shelf, or cabinet top, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new spot on a table, shelf, or cabinet top, then confirm to keep both copies." % _get_active_item_display_name()
 					else:
-						_status_label.text = "Ready to place a duplicate of %s.\nMove it to a new cell, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new floor spot, then confirm to keep both copies." % _get_active_item_display_name()
 				_:
 					if _active_preview_is_wall_placeable():
-						_status_label.text = "Ready to place %s.\nClick or drag on a visible wall cell. This item cuts a window opening into the wall." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\nDrag the item onto the wall, then confirm. This item cuts a window opening into the wall." % _get_active_item_display_name()
 					elif _active_preview_is_ceiling_placeable():
-						_status_label.text = "Ready to place %s.\nClick or drag on a ceiling cell, then rotate with Q/E if needed." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\nDrag the item onto the ceiling, then rotate with Q/E if needed." % _get_active_item_display_name()
 					elif _active_preview_is_support_surface_placeable():
-						_status_label.text = "Ready to place %s.\nClick or drag on a flat table, shelf, or cabinet top, then rotate with Q/E if needed." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\nDrag the item across a flat table, shelf, or cabinet top, then rotate with Q/E if needed." % _get_active_item_display_name()
 					else:
-						_status_label.text = "Ready to place %s.\nLeft-drag the item, use the gizmo handles, or click a floor cell. Q/E still rotates." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\nLeft-drag the item, use the gizmo handles, or orbit with left-drag on empty space. Q/E still rotates." % _get_active_item_display_name()
 		else:
 			match _placement_issue_code:
 				"bounds":
@@ -2223,6 +2249,13 @@ func _pick_interaction_target(mouse_position: Vector2) -> String:
 		return "plane"
 
 	return ""
+
+func _has_camera_conflicting_placement_target(mouse_position: Vector2) -> bool:
+	match _pick_interaction_target(mouse_position):
+		"move", "axis_x", "axis_z", "rotate":
+			return true
+		_:
+			return false
 
 func _pick_placeable_item(mouse_position: Vector2) -> SimpleWoodChair:
 	if _is_pointer_over_placement_ui():
@@ -2732,12 +2765,15 @@ func _is_placeable_effectively_cutaway(placeable: SimpleWoodChair) -> bool:
 	var current: Node = placeable
 	while current != null and current != _placed_items_root:
 		var current_placeable := current as SimpleWoodChair
-		if current_placeable != null and _is_wall_placeable(current_placeable) and current_placeable.hides_with_cutaway_wall():
-			var placement_surface := String(current_placeable.get_meta("placement_surface")) if current_placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
-			if _placement_active and current_placeable == _preview_item and _active_preview_is_wall_placeable():
-				placement_surface = _active_surface_name
-			if bool(_wall_surface_cutaway_states.get(placement_surface, false)):
+		if current_placeable != null:
+			if _is_ceiling_placeable(current_placeable) and _ceiling_surface_cutaway:
 				return true
+			if _is_wall_placeable(current_placeable):
+				var placement_surface := String(current_placeable.get_meta("placement_surface")) if current_placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
+				if _placement_active and current_placeable == _preview_item and _active_preview_is_wall_placeable():
+					placement_surface = _active_surface_name
+				if bool(_wall_surface_cutaway_states.get(placement_surface, false)):
+					return true
 		current = current.get_parent()
 	return false
 

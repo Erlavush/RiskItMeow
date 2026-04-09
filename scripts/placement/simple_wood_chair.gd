@@ -213,7 +213,7 @@ func _collect_mesh_instances(node: Node) -> void:
 func _apply_mode() -> void:
 	if _is_preview:
 		collision_layer = PREVIEW_PICK_LAYER
-	elif _camera_cutaway and get_placement_surface_kind() == RoomConstants.SURFACE_DECOR:
+	elif _camera_cutaway:
 		collision_layer = 0
 	else:
 		collision_layer = (1 << 0) | COLLISION_LAYER

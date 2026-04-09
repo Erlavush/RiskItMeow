@@ -1,0 +1,215 @@
+{
+  "source_mod_id": "tanukidecor",
+  "source_repo_url": "https://github.com/skyjay1/Tanuki-Decor",
+  "source_branch": "dev",
+  "minecraft_version": "1.21.1",
+  "loader": "NeoForge",
+  "license": "GNU LGPLv3",
+  "authors": [
+    "skyjay1"
+  ],
+  "credits": [
+    "Art by Skart2000",
+    "NeoForge 1.21.1 update by Alex (CrabMods)"
+  ],
+  "required_runtime_dependencies": [
+    "minecraft",
+    "neoforge"
+  ],
+  "optional_integrations": [
+    "JEI"
+  ],
+  "verified_counts": {
+    "blockstates": 212,
+    "models_total": 967,
+    "item_models": 213,
+    "textures_total": 218,
+    "java_block_families": {
+      "bed": 14,
+      "clock": 34,
+      "entity": 15,
+      "light": 16,
+      "misc": 55,
+      "seat": 30,
+      "storage": 38
+    }
+  },
+  "visual_themes": [
+    {
+      "theme": "antique",
+      "count": 17
+    },
+    {
+      "theme": "gorgeous",
+      "count": 12
+    },
+    {
+      "theme": "regal",
+      "count": 12
+    },
+    {
+      "theme": "green",
+      "count": 12
+    },
+    {
+      "theme": "blue",
+      "count": 11
+    },
+    {
+      "theme": "minimalist",
+      "count": 11
+    },
+    {
+      "theme": "sweets",
+      "count": 10
+    },
+    {
+      "theme": "cabana",
+      "count": 10
+    },
+    {
+      "theme": "wooden_block",
+      "count": 9
+    },
+    {
+      "theme": "egyptian",
+      "count": 5
+    },
+    {
+      "theme": "mushroom",
+      "count": 5
+    }
+  ],
+  "starter_assets": [
+    {
+      "asset_id": "small_fancy_vase",
+      "difficulty": "easy",
+      "recommended_open_model": "src/main/resources/assets/tanukidecor/models/block/small_fancy_vase/small_fancy_vase.json",
+      "alternative_models": [],
+      "blockstate": "src/main/resources/assets/tanukidecor/blockstates/small_fancy_vase.json",
+      "textures": [
+        "src/main/resources/assets/tanukidecor/textures/block/vase/small_fancy_vase.png"
+      ],
+      "vanilla_dependencies": [],
+      "notes": [
+        "Single model JSON",
+        "Single texture PNG",
+        "No vanilla texture dependency found"
+      ],
+      "next_action": "Use this as the first Blockbench export sanity check."
+    },
+    {
+      "asset_id": "small_striped_vase",
+      "difficulty": "easy",
+      "recommended_open_model": "src/main/resources/assets/tanukidecor/models/block/small_striped_vase/small_striped_vase.json",
+      "alternative_models": [],
+      "blockstate": "src/main/resources/assets/tanukidecor/blockstates/small_striped_vase.json",
+      "textures": [
+        "src/main/resources/assets/tanukidecor/textures/block/vase/small_striped_vase.png"
+      ],
+      "vanilla_dependencies": [],
+      "notes": [
+        "Same structure as small_fancy_vase",
+        "Good second asset to confirm the process is repeatable"
+      ],
+      "next_action": "Export after the first vase so you can compare scale and material results."
+    },
+    {
+      "asset_id": "blue_lamp",
+      "difficulty": "easy-medium",
+      "recommended_open_model": "src/main/resources/assets/tanukidecor/models/block/blue_lamp/blue_lamp.json",
+      "alternative_models": [],
+      "blockstate": "src/main/resources/assets/tanukidecor/blockstates/blue_lamp.json",
+      "textures": [
+        "src/main/resources/assets/tanukidecor/textures/block/blue_dresser.png"
+      ],
+      "vanilla_dependencies": [],
+      "notes": [
+        "Single model JSON",
+        "Texture name does not match asset name",
+        "Uses internal texture reuse rather than a dedicated blue_lamp texture"
+      ],
+      "next_action": "Use this to test whether your process catches internal texture reuse correctly."
+    },
+    {
+      "asset_id": "birdcage",
+      "difficulty": "medium",
+      "recommended_open_model": "src/main/resources/assets/tanukidecor/models/block/birdcage/display.json",
+      "alternative_models": [
+        "src/main/resources/assets/tanukidecor/models/block/birdcage/lower.json",
+        "src/main/resources/assets/tanukidecor/models/block/birdcage/upper.json"
+      ],
+      "blockstate": "src/main/resources/assets/tanukidecor/blockstates/birdcage.json",
+      "textures": [
+        "src/main/resources/assets/tanukidecor/textures/block/birdcage.png"
+      ],
+      "vanilla_dependencies": [],
+      "notes": [
+        "Multipart tall asset",
+        "display.json is the easiest single-file preview",
+        "lower.json and upper.json reflect the in-world split"
+      ],
+      "next_action": "Use display.json first for a quick export, then graduate to lower plus upper if you want exact assembly parity."
+    }
+  ],
+  "do_not_start_here": [
+    {
+      "asset_id": "rough_log_bench",
+      "reason": "References vanilla Minecraft oak_log and oak_log_top textures."
+    },
+    {
+      "asset_id": "slot_machine",
+      "reason": "Block entity and moving sub-parts make it a poor first export target."
+    },
+    {
+      "asset_id": "train_set",
+      "reason": "Block entity plus multiple moving pieces and track variants."
+    },
+    {
+      "asset_id": "diy_workbench",
+      "reason": "Tied to menu and recipe systems that do not matter for the first export pass."
+    },
+    {
+      "asset_id": "antique_wardrobe",
+      "reason": "Multiple states including empty or storage-oriented variants make it harder than a pure prop."
+    },
+    {
+      "asset_id": "antique_bed",
+      "reason": "Bed placement and multi-block assembly are more complex than a single decorative item."
+    }
+  ],
+  "deferred_classes": [
+    {
+      "class_id": "B",
+      "label": "wrapper_candidate",
+      "includes": [
+        "seats",
+        "simple lamps",
+        "selected clocks",
+        "selected display props"
+      ],
+      "reason": "These may become useful Godot props later, but some of them need interaction or assembly wrappers."
+    },
+    {
+      "class_id": "C",
+      "label": "defer_for_now",
+      "includes": [
+        "beds",
+        "storage furniture",
+        "DIY workbench",
+        "slot machine",
+        "train set",
+        "phonograph",
+        "block entity driven props"
+      ],
+      "reason": "These depend on Minecraft systems, block entities, menus, inventories, or complex multi-part behavior."
+    }
+  ],
+  "blockbench_rules": {
+    "resource_root": "src/main/resources/assets",
+    "selection_rule": "Inspect the blockstate first, then open the referenced model JSON from models/block rather than opening the blockstate JSON itself.",
+    "path_mapping_rule": "tanukidecor:block/foo/bar -> src/main/resources/assets/tanukidecor/textures/block/foo/bar.png",
+    "multipart_rule": "If the blockstate is multipart, open each referenced model JSON or use display.json when present for an easier single-file preview.",
+    "vanilla_dependency_rule": "If a model references minecraft:block/... or minecraft:item/..., it is not fully self-contained and needs a vanilla asset decision before export."
+  }
+}

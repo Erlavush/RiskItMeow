@@ -1,7 +1,7 @@
 Risk It Meow
 Third-Party Asset Sources
 
-This file tracks the external assets that are still used by the live runtime catalog after repo cleanup.
+This file tracks the external assets used by the live runtime catalog, plus approved intake sources that are being documented for future one-by-one import work.
 
 1. Titillium Web font
 Source: https://github.com/google/fonts/tree/main/ofl/titilliumweb
@@ -45,3 +45,20 @@ License: unknown from local files
 Used for: Window (Classic)
 Local files: assets/props/window
 Note: the GLB metadata identifies "obj2gltf" as the generator but does not include an author or source URL.
+
+7. Tanuki Decor
+Source: https://github.com/skyjay1/Tanuki-Decor
+Author: skyjay1
+Credits: Art by Skart2000, NeoForge 1.21.1 update by Alex (CrabMods)
+License: GNU LGPLv3
+Used for: approved intake source for one-by-one Blockbench export planning, plus live Wooden Block Clock assembled from user-exported GLBs
+Local files: assets/props/tanuki_decor/wooden_block_clock, data/mod_intake
+Note: the live Wooden Block Clock uses the user's Blockbench-exported `wooden_block_clock.glb`, `long_hand.glb`, `short_hand.glb`, and `pendulum.glb`, assembled and animated in Godot against the repo's Minecraft-style world time controller. Broader Tanuki asset intake should still be triaged one by one because the mod contains multipart assets, internal texture reuse, and some references to vanilla Minecraft parents or textures.
+
+8. Macaw's Lights and Lamps
+Source: https://modrinth.com/mod/macaws-lights-and-lamps
+Author: sketch_macaw
+License: All Rights Reserved
+Used for: Ceiling Fan imported from the user's Blockbench-exported `ceiling_fan.glb`, derived from the mod's `dark_oak_ceiling_fan_light`
+Local files: assets/props/macaws_lights/ceiling_fan
+Note: the packaged mod uses duplicate blade geometry plus animated texture frames to fake rotation. The live repo asset is the user's cleaned Blockbench export with `fan_body` and `fan_blades` groups preserved, and the in-game fan now rotates `fan_blades` smoothly in Godot instead of using the mod's fake texture-driven animation.

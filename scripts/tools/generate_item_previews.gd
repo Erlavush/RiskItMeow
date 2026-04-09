@@ -42,10 +42,4 @@ func _generate_preview_for_item(item_def: Dictionary) -> void:
 	await process_frame
 
 func _create_item_instance(item_def: Dictionary):
-	if PlacementInventoryCatalog.uses_imported_scene_factory(item_def):
-		return PlacementInventoryCatalog.create_imported_scene_instance(item_def)
-
-	var script_ref := PlacementInventoryCatalog.get_item_script(item_def)
-	if script_ref == null:
-		return null
-	return script_ref.new()
+	return PlacementInventoryCatalog.create_item_instance(item_def)

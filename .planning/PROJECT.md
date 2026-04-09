@@ -2,7 +2,7 @@
 
 ## What This Is
 
-Risk It Meow is a manual-feature Godot prototype. The active scene includes one player, an `8x8` room shell with four walls and a roof, one room-view orbit camera, a runtime placement system for furniture, a camera-driven cutaway controller, and a developer environment tuning panel. New features are still added manually, one request at a time.
+Risk It Meow is a manual-feature Godot prototype. The active scene includes one player, an `8x8` room shell with four walls and a roof, an orbit room camera plus a first-person camera mode, a runtime placement system for furniture, a camera-driven cutaway controller, a developer environment tuning panel, and a dedicated single-item debug Item Studio. New features are still added manually, one request at a time.
 
 ## Core Value
 
@@ -13,7 +13,7 @@ Keep the project easy to change by preserving a clean baseline and only adding f
 ### Validated
 
 - [x] The player can move with the existing direct keyboard and mouse controller.
-- [x] The game uses one room-view orbit camera instead of the old multi-camera stack.
+- [x] The game uses one room-view orbit camera as the main building view, with a toggleable first-person player camera for in-room inspection.
 - [x] The main scene shows an `8x8` room with floor, four walls, and a roof.
 - [x] The player stands upright on the floor without the earlier tilt and floating issue.
 - [x] The active scene includes a working furniture placement system with grid snapping, runtime gizmo controls, and placement validation.
@@ -31,10 +31,13 @@ Keep the project easy to change by preserving a clean baseline and only adding f
 - [x] Sun-facing windows add a lightweight interior portal-light workaround so rooms do not go fully dark without real-time GI.
 - [x] The developer environment panel includes persistent Morning, Noon, Sunset, and Afternoon Cozy presets.
 - [x] The left placement browser has `Inventory` and `Shop` tabs, category-filtered browsing, and free unlimited buying into owned stock.
-- [x] The `Low Poly Household Items` FBX pack is imported into the repo and exposed through the shop as a data-driven furniture catalog.
-- [x] The shop scans `112` imported FBX props across `14` categories.
+- [x] The active furniture catalog uses one data-driven imported-item pipeline for the curated live items instead of per-item wrapper scripts.
+- [x] The large archived `Low Poly Household Items` FBX pack has been removed from the repo.
+- [x] The live catalog is currently a curated `7`-item set: `simple_wood_chair`, `office_chair`, `office_desk_computer`, `pizzeria_fridge`, `small_shelf`, `window`, and `window_classic`.
 - [x] Browser cards now use generated PNG thumbnails instead of live runtime 3D preview scenes.
-- [x] Item preview thumbnails are generated into `assets/ui/item_previews` and currently total `120` cached PNG previews.
+- [x] Item preview thumbnails are generated into `assets/ui/item_previews` and currently total `7` cached preview PNGs for the live catalog.
+- [x] A dedicated debug `Item Studio` exists for per-item tuning with preview/edit modes, gizmos, local override saving, and mount-aware guides.
+- [x] The player tools panel can switch between orbit room view and first-person view at runtime.
 
 ### Active
 
@@ -42,8 +45,8 @@ Keep the project easy to change by preserving a clean baseline and only adding f
 
 ### Known Rough Edges
 
-- [ ] Many imported FBX props still use generic scale, pivot, and collision heuristics and need per-item tuning.
-- [ ] Imported household items are available for buying and placing, but not yet fully curated for perfect gameplay fit.
+- [ ] Some curated items still rely on manual local tuning overrides for perfect collision, offsets, and scale fit.
+- [ ] `Small Shelf` and `Window (Classic)` still need original source confirmation for the consolidated third-party asset list.
 
 ### Out of Scope
 
@@ -55,13 +58,14 @@ Keep the project easy to change by preserving a clean baseline and only adding f
 ## Context
 
 - The earlier source-porting direction has been intentionally removed.
-- The current prototype still reuses the existing Godot player controller, Minecraft-style rig, and orbit camera.
+- The current prototype still reuses the existing Godot player controller, Minecraft-style rig, and orbit camera, but now also supports a first-person inspection mode.
 - The room shell is used as a full single-room shell with four walls and a roof, while runtime cutaway keeps the interior readable.
 - Placement includes a browser-style left panel with Build/Edit switching, Inventory/Shop tabs, category browsing, item preview cards, owned stock counts, dotted grid overlay, floor-finish switching, Save/Load/Clear Room controls, floor furniture, wall windows, preview states, and runtime gizmo dragging.
 - Camera-facing walls and the roof switch to a cutaway render mode at runtime instead of being actually removed, which keeps wall collisions and shadows intact.
 - Window lighting uses a fake-but-cheap approach: directional sun still drives the outdoor lighting direction, while sun-facing windows create warm non-shadowing interior fill lights and a room bounce light.
 - A developer panel in the top-right exposes live environment tuning, stores those values in `user://developer_environment_settings.cfg`, and reapplies the saved preset in the editor preview.
 - The shop browser no longer creates live 3D preview scenes at runtime. Instead it loads cached PNG thumbnails generated by the tooling script.
+- The debug workflow now centers on a single-item Item Studio instead of the old multi-item showroom, and local item tuning overrides persist to `user://placement_item_profile_overrides.cfg`.
 - A `temporary/.gdignore` file is intentionally present so Godot does not re-index duplicated legacy pizzeria source assets.
 
 ## Constraints
@@ -83,8 +87,10 @@ Keep the project easy to change by preserving a clean baseline and only adding f
 | Persist the room layout locally | The prototype needed to remember placed furniture and floor finish across runs | The room autosaves to `user://room_layout.json` and can also be saved, loaded, or cleared from the left panel |
 | Add real wall window placement instead of only floor props | The user wants windows to mount into walls and leave real openings for future wall decor systems | The placement manager supports wall-mounted window placement, and the room shell rebuilds segmented walls around window openings |
 | Mirror local saved state in the editor preview | The user wants saved room layout and lighting tweaks visible in the editor 3D view without rebaking the scene each time | Tool-mode preview logic reapplies `user://room_layout.json` and `user://developer_environment_settings.cfg` while the scene is open in the editor |
-| Replace the simple stock list with a real shop and owned inventory browser | The user wants a scalable furniture workflow with categories, previews, and free buying before any coin system exists | The left panel separates Inventory from Shop, browses a scanned household catalog, and persists owned stock locally |
-| Replace unstable live 3D card previews with cached PNG thumbnails | Runtime card previews were leaking objects into the live scene and producing broken/black images for imported FBX assets | Browser cards now load generated PNG thumbnails from `assets/ui/item_previews`, and a preview generator script rebuilds them when the catalog changes |
+| Replace the simple stock list with a real shop and owned inventory browser | The user wants a scalable furniture workflow with categories, previews, and free buying before any coin system exists | The left panel separates Inventory from Shop, browses the curated imported-item catalog, and persists owned stock locally |
+| Replace unstable live 3D card previews with cached PNG thumbnails | Runtime card previews were leaking objects into the live scene and producing broken/black images for imported assets | Browser cards now load generated PNG thumbnails from `assets/ui/item_previews`, and a preview generator script rebuilds them when the catalog changes |
+| Collapse item debugging into a dedicated Item Studio | Editing item size/collision inside the old showroom flow was too noisy and inconvenient | The debug workflow now isolates one item at a time with preview/edit modes, gizmos, overlays, and persistent local tuning overrides |
+| Keep a curated imported-item pipeline instead of the old giant household pack | The user wants a cleaner repo and only the chosen active items to remain live | The deleted household FBX pack is gone, the live catalog is curated, and the item pipeline stays unified and tunable |
 
 ---
-*Last updated: 2026-04-07 after stabilizing browser previews and writing session handoff docs*
+*Last updated: 2026-04-09 after repo cleanup, Item Studio restoration, and planning-doc refresh*

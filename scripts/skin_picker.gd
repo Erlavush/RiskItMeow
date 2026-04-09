@@ -140,6 +140,18 @@ func _update_view_button() -> void:
 func refresh_camera_ui() -> void:
 	_update_view_button()
 
+func toggle_tools_panel() -> void:
+	_set_panel_open(not _panel_open)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event == null or not visible:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key_event := event as InputEventKey
+		if key_event.keycode == KEY_F4:
+			toggle_tools_panel()
+			get_viewport().set_input_as_handled()
+
 func _on_viewport_size_changed() -> void:
 	_update_panel_layout(false)
 
@@ -241,4 +253,4 @@ func _on_view_button_pressed() -> void:
 		if mode_label == "First Person":
 			status_label.text = "First-person camera active. Move the mouse to look, press Esc to release the cursor, and left-click to recapture it."
 		else:
-			status_label.text = "Room-view camera active. Right-drag or middle-drag to orbit, wheel to zoom, and Home resets the room camera."
+			status_label.text = "Room-view camera active. Left-drag on empty space to orbit, wheel to zoom, and Home resets the room camera."

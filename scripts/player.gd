@@ -12,6 +12,7 @@ const FIRST_PERSON_MAX_PITCH: float = 1.2
 const FIRST_PERSON_EYE_FALLBACK_Y: float = 1.625
 
 @export var room_camera_controller_path: NodePath
+@export var placement_manager_path: NodePath
 
 var skin_ui: SkinPicker
 var room_bounds_half_extents: Vector2 = RoomConstants.DEFAULT_ROOM_HALF_EXTENTS - Vector2.ONE * ROOM_MARGIN
@@ -26,6 +27,7 @@ var _first_person_mouse_captured := false
 @onready var first_person_pivot: Node3D = $FirstPersonPivot
 @onready var first_person_camera: Camera3D = $FirstPersonPivot/Camera3D
 @onready var room_camera_controller: Node = get_node_or_null(room_camera_controller_path)
+@onready var placement_manager: Node = get_node_or_null(placement_manager_path)
 
 func _ready() -> void:
 	_normalize_player_pose()
@@ -50,11 +52,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _debug_world_active:
 		return
 
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key_event := event as InputEventKey
+		if key_event.keycode == KEY_F5:
+			toggle_camera_mode()
+			get_viewport().set_input_as_handled()
+			return
+
 	if _camera_mode == CAMERA_MODE_FIRST_PERSON and _handle_first_person_input(event):
 		get_viewport().set_input_as_handled()
 		return
 
 	if _camera_mode == CAMERA_MODE_ROOM and room_camera_controller != null:
+		if _should_block_room_camera_input(event):
+			return
 		var camera_handled: bool = room_camera_controller.handle_input_event(event)
 		if camera_handled:
 			get_viewport().set_input_as_handled()
@@ -284,6 +295,13 @@ func _get_room_camera() -> Camera3D:
 	if room_camera_controller != null and room_camera_controller.has_method("get_camera"):
 		return room_camera_controller.call("get_camera") as Camera3D
 	return legacy_camera
+
+func _should_block_room_camera_input(event: InputEvent) -> bool:
+	if event == null or placement_manager == null:
+		return false
+	if not placement_manager.has_method("blocks_room_camera_input"):
+		return false
+	return bool(placement_manager.call("blocks_room_camera_input", event))
 
 func _normalize_player_pose() -> void:
 	rotation = Vector3(0.0, rotation.y, 0.0)

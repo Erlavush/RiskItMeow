@@ -16,6 +16,8 @@ var _developer_environment_panel: DeveloperEnvironmentPanel
 var _bounce_light: OmniLight3D
 var _portal_lights: Dictionary = {}
 var _sync_requested := false
+var _last_sun_direction := Vector3.ZERO
+var _has_last_sun_direction := false
 
 func _ready() -> void:
 	_room_shell = get_node_or_null(room_shell_path) as RoomShell
@@ -24,7 +26,18 @@ func _ready() -> void:
 	_developer_environment_panel = _resolve_developer_environment_panel()
 	_ensure_bounce_light()
 	_connect_runtime_signals()
+	if not Engine.is_editor_hint():
+		set_process(true)
 	_request_sunlight_sync(true)
+
+func _process(_delta: float) -> void:
+	if _directional_light == null:
+		return
+	var current_sun_direction := _directional_light.global_basis.z.normalized()
+	if not _has_last_sun_direction or current_sun_direction.distance_squared_to(_last_sun_direction) > 0.0001:
+		_last_sun_direction = current_sun_direction
+		_has_last_sun_direction = true
+		_request_sunlight_sync()
 
 func _connect_runtime_signals() -> void:
 	if _placement_manager != null and _placement_manager.has_signal("room_layout_visuals_changed"):
@@ -83,8 +96,20 @@ func _sync_window_sunlight(_force: bool = false) -> void:
 		if _bounce_light != null:
 			_bounce_light.visible = false
 		return
+	if not _directional_light.visible or _directional_light.light_energy <= 0.001:
+		_set_portals_hidden()
+		if _bounce_light != null:
+			_bounce_light.visible = false
+		return
 
 	var sun_from_direction := _directional_light.global_basis.z.normalized()
+	if sun_from_direction.y <= 0.0:
+		_set_portals_hidden()
+		if _bounce_light != null:
+			_bounce_light.visible = false
+		return
+	_last_sun_direction = sun_from_direction
+	_has_last_sun_direction = true
 	var seen_ids: Dictionary = {}
 	var total_exposure := 0.0
 

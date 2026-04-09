@@ -119,6 +119,9 @@ func _prepare_placeable_for_preview(placeable: SimpleWoodChair) -> void:
 		footprint.visible = false
 
 func _frame_placeable(placeable: SimpleWoodChair) -> void:
+	var preview_yaw := float(_pending_item_def.get("preview_yaw", 0.0))
+	placeable.rotation.y = preview_yaw
+
 	var bounds := _compute_visual_bounds(placeable)
 	var min_corner: Vector3 = bounds.get("min", Vector3.ZERO) as Vector3
 	var max_corner: Vector3 = bounds.get("max", placeable.get_collision_size()) as Vector3

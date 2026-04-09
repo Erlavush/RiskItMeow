@@ -1,45 +1,42 @@
 # Technology Stack
 
 ## Languages
-- Primary runtime code is GDScript in `scripts/player.gd`, `scripts/MinecraftRig.gd`, `scripts/skin_picker.gd`, `scripts/WorldGenerator.gd`, and `scripts/dump_codebase.gd`.
-- Scene composition is stored as Godot text scenes in `scenes/main.tscn` and `scenes/player.tscn`.
-- Project configuration lives in the Godot INI-style file `project.godot`.
-- Tooling also includes a small Python helper in `generate_scene.py`.
-- Project notes and workflow context live in Markdown files such as `ROADMAP.md`, `GODOT_QUIRKS.md`, and `GDSCRIPT_EXPERTISE.md`.
+- Primary runtime code is GDScript in `scripts/player.gd`, `scripts/MinecraftRig.gd`, `scripts/placement/*.gd`, `scripts/room/*.gd`, and `scripts/debug/*.gd`.
+- Scene composition is stored in Godot text scenes such as `scenes/main.tscn`, `scenes/player.tscn`, and `scenes/room/room_shell.tscn`.
+- Rendering helpers use Godot shaders in `shaders/grid_overlay.gdshader` and `shaders/floor_checker.gdshader`.
+- Project configuration and workflow context live in `project.godot`, `CLAUDE.md`, `ROADMAP.md`, and `.planning/*.md`.
+- Tooling also includes a Windows batch wrapper in `scripts/tools/run_godot_headless.cmd` and a legacy Python helper in `generate_scene.py`.
 
-## Runtime
-- The project is a Godot 4.6 application configured in `project.godot`.
-- `project.godot` sets `run/main_scene="res://scenes/main.tscn"`, so `scenes/main.tscn` is the runtime entry scene.
-- Rendering uses `gl_compatibility` on desktop and mobile, which fits the stated web/mobile browser target in `ROADMAP.md`.
-- Physics is configured to use Jolt via `3d/physics_engine="Jolt Physics"` in `project.godot`.
-- There are no autoload singletons defined in `project.godot`.
-- Runtime behavior is mostly node-driven: `CharacterBody3D`, `Node3D`, `SpringArm3D`, `Camera3D`, `CanvasLayer`, and `WorldEnvironment`.
+## Engine And Runtime
+- The project runs on Godot `4.6.1` and boots `res://scenes/main.tscn` from `project.godot`.
+- Physics uses `Jolt Physics` via `project.godot`.
+- Rendering uses the `gl_compatibility` renderer, with `d3d12` selected as the Windows rendering device in `project.godot`.
+- There are no autoload singletons; runtime wiring is scene-local and node-driven.
+- The main world scene composes `RoomShell`, `RoomViewCameraController`, `PlacementManager`, `RoomCutawayController`, `RoomSunlightController`, `DebugWorldController`, `DeveloperEnvironmentPanel`, and the instanced `Player`.
 
-## Frameworks
-- The codebase relies on stock Godot engine APIs rather than external packages.
-- Scene instancing is central: `scenes/main.tscn` instances `scenes/player.tscn`.
-- Character movement and camera behavior are implemented in `scripts/player.gd`.
-- Procedural rig generation and animation are implemented in `scripts/MinecraftRig.gd`.
-- Runtime UI is constructed in code with Godot Control nodes inside `scripts/skin_picker.gd`.
-- Editor-time automation uses `@tool` scripts in `scripts/MinecraftRig.gd`, `scripts/WorldGenerator.gd`, and `scripts/dump_codebase.gd`.
+## Core Runtime Systems
+- Player movement, room/first-person camera switching, and input handling live in `scripts/player.gd`.
+- The Minecraft-style avatar rig and skin loading pipeline live in `scripts/MinecraftRig.gd`, `scripts/minecraft_rig/*.gd`, and `scripts/skin_picker.gd`.
+- The room shell, wall segmentation, floor materials, cutaway logic, and sunlight helpers live in `scripts/room/*.gd`.
+- The build/edit placement browser, validation, room save/load, imported-item catalog, and preview cache live in `scripts/placement/*.gd`.
+- Developer-only lighting tuning and the in-game Item Studio live in `scripts/debug/*.gd`.
 
-## Key Dependencies
-- There is no package manager manifest such as `package.json`, `requirements.txt`, or `Cargo.toml`; the main dependency is the installed Godot editor/runtime.
-- `skin.png` is the default texture asset used by `scenes/player.tscn` and `scripts/MinecraftRig.gd`.
-- `scripts/skin_picker.gd` depends on OS and dialog APIs such as `OS.get_system_dir()` and `FileDialog`.
-- `scripts/dump_codebase.gd` depends on editor-only APIs such as `EditorScript`, `DirAccess`, and `FileAccess`.
-- `.vscode/settings.json` pins a local Windows Godot executable path for development.
+## Assets And Content
+- Runtime props are curated imported scenes under `assets/props/`.
+- Generated browser thumbnails are cached under `assets/ui/item_previews/`.
+- UI fonts live under `assets/ui/fonts/titillium_web/`.
+- Floor textures live under `assets/textures/floors/`.
+- Legacy source assets are intentionally preserved under `temporary/` and hidden from Godot scanning with `temporary/.gdignore`.
 
-## Configuration
-- `project.godot` is the canonical engine configuration file.
-- `.gitignore` excludes `.godot/`, `.import/`, export presets, and `.vscode/`.
-- `.gitattributes` normalizes text files to LF line endings.
-- `.vscode/settings.json` points Godot Tools to `z:\\Godot_v4.6.1-stable_win64.exe\\Godot_v4.6.1-stable_win64.exe`.
-- `compiled_codebase.txt` is a generated export target produced by `scripts/dump_codebase.gd`.
+## Configuration And Tooling
+- `LOCAL_TOOLING.md` documents the local Windows Godot GUI and console executables.
+- `scripts/tools/run_godot_headless.cmd` redirects Godot user-data paths into `.godot_user/` for headless runs.
+- `scripts/tools/generate_item_previews.gd` regenerates the cached PNG thumbnails used by the placement browser.
+- `scripts/dump_codebase.gd` exports a text snapshot of the repo into `compiled_codebase.txt` for AI review workflows.
+- There is no package-manager manifest such as `package.json`, `requirements.txt`, or `Cargo.toml`.
 
-## Platform Requirements
-- Development appears Windows-oriented because of the VS Code Godot path in `.vscode/settings.json`.
-- The intended deployment target is web/mobile web per `ROADMAP.md`.
-- Current gameplay input in `scripts/player.gd` is keyboard and mouse based, so mobile input is not implemented yet.
-- Current skin import flow in `scripts/skin_picker.gd` expects desktop filesystem access, which is weaker for web exports.
-- No export presets are present, so packaging and deployment configuration has not been established in-repo yet.
+## Platform Assumptions
+- The repo is currently Windows-first for development because local tooling paths and the headless wrapper are Windows-specific.
+- Runtime input is desktop keyboard and mouse oriented; there is no touch-input layer or InputMap abstraction yet.
+- No `export_presets.cfg` is committed, so deployment/export configuration is not tracked in-repo.
+- The current project shape is a local Godot prototype rather than a networked game or browser-ready build.
