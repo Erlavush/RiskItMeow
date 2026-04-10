@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: manual-feature-buildout
 status: active
 stopped_at: Quick task 260409-whv delivered placement-mode improvements; next recommended step is manual in-game QA for free placement and smooth rotation feel
-last_updated: "2026-04-10T08:59:31.126Z"
+last_updated: "2026-04-10T09:06:55.728Z"
 last_activity: 2026-04-10 -- implemented grid/free placement plus rotation snap/smooth toggles, then fixed rotated planar-bounds validation for smooth rotation on snapped placement
 progress:
   total_phases: 1
@@ -80,7 +80,7 @@ Resume command: Launch the game, manually test `Grid Placement` and `Rotation Sn
 
 ### Pending Todos
 
-- 23 pending todos in `.planning/todos/pending/`
+- 48 pending todos in `.planning/todos/pending/`
 - `2026-04-04-add-bake-feature-for-saved-state.md` - Add bake feature for saved state
 - `2026-04-10-add-ambient-minecraft-style-cat-companions.md` - Add ambient Minecraft-style cat companions
 - `2026-04-10-add-undo-and-redo-placement-history.md` - Add undo and redo placement history
@@ -93,6 +93,31 @@ Resume command: Launch the game, manually test `Grid Placement` and `Rotation Sn
 - `2026-04-10-add-weather-ambience-outside-the-room.md` - Add weather ambience outside the room
 - `2026-04-10-add-dynamic-ambient-audio-system.md` - Add dynamic ambient audio system
 - `2026-04-10-add-room-coziness-scoring-system.md` - Add room coziness scoring system
+- `2026-04-10-add-favorites-and-recent-items-bar.md` - Add favorites and recent items bar
+- `2026-04-10-add-advanced-catalog-search-and-tag-filters.md` - Add advanced catalog search and tag filters
+- `2026-04-10-add-theme-collections-and-matched-sets.md` - Add theme collections and matched sets
+- `2026-04-10-add-achievement-and-milestone-board.md` - Add achievement and milestone board
+- `2026-04-10-add-local-design-challenges.md` - Add local design challenges
+- `2026-04-10-add-functional-music-player-furniture.md` - Add functional music player furniture
+- `2026-04-10-add-shelf-and-cabinet-display-slot-system.md` - Add shelf and cabinet display slot system
+- `2026-04-10-add-room-cleaning-and-upkeep-layer.md` - Add room cleaning and upkeep layer
+- `2026-04-10-add-seasonal-and-holiday-decor-mode.md` - Add seasonal and holiday decor mode
+- `2026-04-10-add-guest-visit-and-reaction-system.md` - Add guest visit and reaction system
+- `2026-04-10-add-item-aging-and-patina-variants.md` - Add item aging and patina variants
+- `2026-04-10-add-room-journal-and-snapshot-captions.md` - Add room journal and snapshot captions
+- `2026-04-10-add-quick-build-radial-menu.md` - Add quick-build radial menu
+- `2026-04-10-add-guided-onboarding-and-contextual-build-tips.md` - Add guided onboarding and contextual build tips
+- `2026-04-10-add-style-detector-and-theme-recommendations.md` - Add style detector and theme recommendations
+- `2026-04-10-add-dynamic-soundtrack-manager.md` - Add dynamic soundtrack manager
+- `2026-04-10-add-window-backdrop-biome-presets.md` - Add window backdrop biome presets
+- `2026-04-10-add-ambient-motion-accents-for-decor.md` - Add ambient motion accents for decor
+- `2026-04-10-add-animated-utility-props.md` - Add animated utility props
+- `2026-04-10-add-collectible-catalog-and-completion-tracker.md` - Add collectible catalog and completion tracker
+- `2026-04-10-add-featured-item-rotation-and-shop-themes.md` - Add featured item rotation and shop themes
+- `2026-04-10-add-decal-and-sticker-placement-system.md` - Add decal and sticker placement system
+- `2026-04-10-add-walkability-and-comfort-heatmap-overlay.md` - Add walkability and comfort heatmap overlay
+- `2026-04-10-add-secret-interactions-and-easter-eggs.md` - Add secret interactions and easter eggs
+- `2026-04-10-add-item-delivery-and-unboxing-flow.md` - Add item delivery and unboxing flow
 - `2026-04-10-add-placeable-aquarium-with-animated-fish.md` - Add placeable aquarium with animated fish
 - `2026-04-10-add-room-shell-customization-tools.md` - Add room shell customization tools
 - `2026-04-10-add-second-floor-and-rooftop-support.md` - Add second floor and rooftop support
