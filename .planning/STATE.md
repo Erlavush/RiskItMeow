@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: manual-feature-buildout
 status: active
 stopped_at: Quick task 260409-whv delivered placement-mode improvements; next recommended step is manual in-game QA for free placement and smooth rotation feel
-last_updated: "2026-04-10T08:01:21.500Z"
+last_updated: "2026-04-10T08:59:31.126Z"
 last_activity: 2026-04-10 -- implemented grid/free placement plus rotation snap/smooth toggles, then fixed rotated planar-bounds validation for smooth rotation on snapped placement
 progress:
   total_phases: 1
@@ -80,9 +80,19 @@ Resume command: Launch the game, manually test `Grid Placement` and `Rotation Sn
 
 ### Pending Todos
 
-- 13 pending todos in `.planning/todos/pending/`
+- 23 pending todos in `.planning/todos/pending/`
 - `2026-04-04-add-bake-feature-for-saved-state.md` - Add bake feature for saved state
 - `2026-04-10-add-ambient-minecraft-style-cat-companions.md` - Add ambient Minecraft-style cat companions
+- `2026-04-10-add-undo-and-redo-placement-history.md` - Add undo and redo placement history
+- `2026-04-10-add-room-blueprint-and-preset-system.md` - Add room blueprint and preset system
+- `2026-04-10-add-furniture-recolor-and-material-variants.md` - Add furniture recolor and material variants
+- `2026-04-10-add-multi-select-and-group-transform-editing.md` - Add multi-select and group transform editing
+- `2026-04-10-add-smart-placement-alignment-guides.md` - Add smart placement alignment guides
+- `2026-04-10-add-symmetry-and-mirror-build-mode.md` - Add symmetry and mirror build mode
+- `2026-04-10-add-photo-mode-and-showcase-camera.md` - Add photo mode and showcase camera
+- `2026-04-10-add-weather-ambience-outside-the-room.md` - Add weather ambience outside the room
+- `2026-04-10-add-dynamic-ambient-audio-system.md` - Add dynamic ambient audio system
+- `2026-04-10-add-room-coziness-scoring-system.md` - Add room coziness scoring system
 - `2026-04-10-add-placeable-aquarium-with-animated-fish.md` - Add placeable aquarium with animated fish
 - `2026-04-10-add-room-shell-customization-tools.md` - Add room shell customization tools
 - `2026-04-10-add-second-floor-and-rooftop-support.md` - Add second floor and rooftop support
