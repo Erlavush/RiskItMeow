@@ -18,6 +18,8 @@ const BROWSER_GRID_H_SEPARATION := 8.0
 const BROWSER_CARD_MIN_WIDTH := 126.0
 const GIZMO_RING_RADIUS := 0.6
 const ROTATION_SNAP_STEP := PI * 0.5
+const SMOOTH_ROTATION_KEY_STEP := deg_to_rad(1.0)
+const SMOOTH_ROTATION_PRECISION_STEP := deg_to_rad(0.01)
 const GIZMO_COLLISION_LAYER := 1 << 4
 const GIZMO_DISTANCE_SCALE := 0.08
 const GIZMO_MIN_SCALE := 0.92
@@ -50,7 +52,8 @@ var _item_stock: Dictionary = {}
 var _item_owned_totals: Dictionary = {}
 var _placed_item_counts: Dictionary = {}
 var _shop_categories: Array[String] = []
-var _manual_grid_visible := false
+var _grid_placement_enabled := true
+var _rotation_snap_enabled := true
 var _editor_mode := EDITOR_MODE_BUILD
 var _browser_mode := BROWSER_MODE_INVENTORY
 var _browser_open := false
@@ -96,9 +99,9 @@ var _ui_layer: CanvasLayer
 var _ui_root: Control
 var _browser_toggle_button: Button
 var _inventory_panel: PanelContainer
+var _browser_layout: VBoxContainer
 var _mode_buttons: Dictionary = {}
 var _browser_mode_buttons: Dictionary = {}
-var _shop_category_buttons: Dictionary = {}
 var _mount_filter_buttons: Dictionary = {}
 var _floor_style_buttons: Dictionary = {}
 var _panel_title_label: Label
@@ -111,13 +114,11 @@ var _mount_filter_option: OptionButton
 var _category_filter_option: OptionButton
 var _browser_scroll: ScrollContainer
 var _browser_grid: GridContainer
-var _shop_category_scroll: ScrollContainer
-var _shop_category_flow: HFlowContainer
-var _mount_filter_flow: HFlowContainer
 var _tools_toggle_button: Button
 var _tools_section: VBoxContainer
 var _status_shell: PanelContainer
 var _grid_toggle_button: Button
+var _rotation_toggle_button: Button
 var _save_button: Button
 var _load_button: Button
 var _clear_room_button: Button
@@ -307,6 +308,13 @@ func blocks_room_camera_input(event: InputEvent) -> bool:
 	if event == null or _debug_world_active:
 		return false
 
+	if event is InputEventMouseButton:
+		var mouse_button := event as InputEventMouseButton
+		if _is_pointer_over_placement_ui():
+			match mouse_button.button_index:
+				MOUSE_BUTTON_LEFT, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT:
+					return true
+
 	if _placement_active:
 		if _drag_mode != "":
 			if event is InputEventMouseButton:
@@ -335,6 +343,7 @@ func _activate_browser_shortcut(next_editor_mode: String, next_browser_mode: Str
 	_editor_mode = next_editor_mode
 	_browser_mode = next_browser_mode
 	_set_browser_open(true)
+	_update_mode_ui()
 	_update_inventory_ui()
 	_update_status_text()
 	_update_popup_visuals()
@@ -437,35 +446,35 @@ func _build_ui() -> void:
 	margin.add_theme_constant_override("margin_bottom", 12)
 	_inventory_panel.add_child(margin)
 
-	var layout := VBoxContainer.new()
-	layout.add_theme_constant_override("separation", 8)
-	margin.add_child(layout)
+	_browser_layout = VBoxContainer.new()
+	_browser_layout.add_theme_constant_override("separation", 8)
+	margin.add_child(_browser_layout)
 
 	_panel_title_label = Label.new()
 	_panel_title_label.text = "Build Browser"
 	_panel_title_label.add_theme_font_size_override("font_size", 18)
 	PlacementUiStyles.apply_label_color(_panel_title_label, PlacementUiStyles.COLOR_TEXT)
-	layout.add_child(_panel_title_label)
+	_browser_layout.add_child(_panel_title_label)
 
 	_mode_label = null
 
 	var mode_button_row := HBoxContainer.new()
 	mode_button_row.add_theme_constant_override("separation", 6)
-	layout.add_child(mode_button_row)
+	_browser_layout.add_child(mode_button_row)
 
 	_add_mode_button(mode_button_row, "Build", EDITOR_MODE_BUILD)
 	_add_mode_button(mode_button_row, "Edit", EDITOR_MODE_EDIT)
 
 	var browser_mode_row := HBoxContainer.new()
 	browser_mode_row.add_theme_constant_override("separation", 6)
-	layout.add_child(browser_mode_row)
+	_browser_layout.add_child(browser_mode_row)
 
 	_add_browser_mode_button(browser_mode_row, "Inventory", BROWSER_MODE_INVENTORY)
 	_add_browser_mode_button(browser_mode_row, "Shop", BROWSER_MODE_SHOP)
 
 	var search_row := HBoxContainer.new()
 	search_row.add_theme_constant_override("separation", 6)
-	layout.add_child(search_row)
+	_browser_layout.add_child(search_row)
 
 	_browser_search_input = LineEdit.new()
 	_browser_search_input.placeholder_text = "Search items..."
@@ -477,7 +486,7 @@ func _build_ui() -> void:
 
 	var filter_row := HBoxContainer.new()
 	filter_row.add_theme_constant_override("separation", 6)
-	layout.add_child(filter_row)
+	_browser_layout.add_child(filter_row)
 
 	_mount_filter_option = OptionButton.new()
 	_mount_filter_option.custom_minimum_size = Vector2(0.0, 34.0)
@@ -489,7 +498,7 @@ func _build_ui() -> void:
 	_browser_section_label.text = "Browse Items"
 	_browser_section_label.add_theme_font_size_override("font_size", 11)
 	PlacementUiStyles.apply_label_color(_browser_section_label, PlacementUiStyles.COLOR_TEXT_MUTED)
-	layout.add_child(_browser_section_label)
+	_browser_layout.add_child(_browser_section_label)
 
 	_category_filter_option = OptionButton.new()
 	_category_filter_option.custom_minimum_size = Vector2(0.0, 34.0)
@@ -501,9 +510,14 @@ func _build_ui() -> void:
 	_browser_scroll.custom_minimum_size = Vector2(0.0, 140.0)
 	_browser_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_browser_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_browser_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_browser_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	layout.add_child(_browser_scroll)
+	_browser_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	_browser_scroll.mouse_force_pass_scroll_events = true
+	var horizontal_scroll_mode: ScrollContainer.ScrollMode = ScrollContainer.SCROLL_MODE_DISABLED
+	var vertical_scroll_mode: ScrollContainer.ScrollMode = ScrollContainer.SCROLL_MODE_AUTO
+	_browser_scroll.horizontal_scroll_mode = horizontal_scroll_mode
+	_browser_scroll.vertical_scroll_mode = vertical_scroll_mode
+	_browser_scroll.gui_input.connect(_on_browser_scroll_gui_input)
+	_browser_layout.add_child(_browser_scroll)
 
 	_browser_grid = GridContainer.new()
 	_browser_grid.columns = 2
@@ -511,11 +525,15 @@ func _build_ui() -> void:
 	_browser_grid.add_theme_constant_override("h_separation", BROWSER_GRID_H_SEPARATION)
 	_browser_grid.add_theme_constant_override("v_separation", 12)
 	_browser_scroll.add_child(_browser_grid)
+	var browser_scroll_bar := _browser_scroll.get_v_scroll_bar()
+	if browser_scroll_bar != null:
+		browser_scroll_bar.custom_minimum_size = Vector2(8.0, 0.0)
+		browser_scroll_bar.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	_status_shell = PanelContainer.new()
 	PlacementUiStyles.apply_panel_style(_status_shell, PlacementUiStyles.COLOR_PANEL_SOFT, PlacementUiStyles.COLOR_BORDER_SOFT, 1, 14, 4, 0.12)
 	_status_shell.visible = false
-	layout.add_child(_status_shell)
+	_browser_layout.add_child(_status_shell)
 
 	var status_margin := MarginContainer.new()
 	status_margin.add_theme_constant_override("margin_left", 10)
@@ -535,12 +553,12 @@ func _build_ui() -> void:
 	_tools_toggle_button.toggle_mode = true
 	_tools_toggle_button.text = "More Tools"
 	_tools_toggle_button.pressed.connect(_on_tools_toggle_pressed)
-	layout.add_child(_tools_toggle_button)
+	_browser_layout.add_child(_tools_toggle_button)
 
 	_tools_section = VBoxContainer.new()
 	_tools_section.visible = false
 	_tools_section.add_theme_constant_override("separation", 8)
-	layout.add_child(_tools_section)
+	_browser_layout.add_child(_tools_section)
 
 	_floor_style_label = Label.new()
 	_floor_style_label.text = "Floor Finish"
@@ -559,6 +577,11 @@ func _build_ui() -> void:
 	_grid_toggle_button.custom_minimum_size = Vector2(0.0, 36.0)
 	_grid_toggle_button.pressed.connect(_on_grid_toggle_button_pressed)
 	_tools_section.add_child(_grid_toggle_button)
+
+	_rotation_toggle_button = Button.new()
+	_rotation_toggle_button.custom_minimum_size = Vector2(0.0, 36.0)
+	_rotation_toggle_button.pressed.connect(_on_rotation_toggle_button_pressed)
+	_tools_section.add_child(_rotation_toggle_button)
 
 	var persistence_row := HBoxContainer.new()
 	persistence_row.add_theme_constant_override("separation", 8)
@@ -770,6 +793,25 @@ func _on_tools_toggle_pressed() -> void:
 		_tools_section.visible = _tools_toggle_button.button_pressed
 	_update_section_toggle_ui()
 
+func _on_browser_scroll_gui_input(event: InputEvent) -> void:
+	if _browser_scroll == null or event == null:
+		return
+	if event is InputEventMouseButton:
+		var mouse_button := event as InputEventMouseButton
+		if not mouse_button.pressed:
+			return
+		var scroll_bar := _browser_scroll.get_v_scroll_bar()
+		if scroll_bar == null:
+			return
+		var step_size := maxf(scroll_bar.page * 0.28, 56.0)
+		match mouse_button.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				scroll_bar.value = maxf(scroll_bar.min_value, scroll_bar.value - step_size)
+				_browser_scroll.accept_event()
+			MOUSE_BUTTON_WHEEL_DOWN:
+				scroll_bar.value = minf(scroll_bar.max_value - scroll_bar.page, scroll_bar.value + step_size)
+				_browser_scroll.accept_event()
+
 func _set_browser_open(is_open: bool, animate: bool = true) -> void:
 	_browser_open = is_open
 	_update_browser_toggle_button_visual()
@@ -787,6 +829,8 @@ func _set_browser_open(is_open: bool, animate: bool = true) -> void:
 	if not animate:
 		_inventory_panel.position = target_position
 		_inventory_panel.modulate = Color(1.0, 1.0, 1.0, 1.0 if _browser_open else 0.0)
+		if _browser_open:
+			_queue_browser_layout_refresh()
 		return
 
 	_browser_panel_tween = create_tween()
@@ -794,6 +838,8 @@ func _set_browser_open(is_open: bool, animate: bool = true) -> void:
 	_browser_panel_tween.set_ease(Tween.EASE_OUT)
 	_browser_panel_tween.parallel().tween_property(_inventory_panel, "position", target_position, BROWSER_ANIMATION_DURATION)
 	_browser_panel_tween.parallel().tween_property(_inventory_panel, "modulate", Color(1.0, 1.0, 1.0, 1.0 if _browser_open else 0.0), BROWSER_ANIMATION_DURATION * 0.9)
+	if _browser_open:
+		_browser_panel_tween.finished.connect(_queue_browser_layout_refresh, CONNECT_ONE_SHOT)
 
 func _get_browser_top_margin(viewport_size: Vector2) -> float:
 	return clampf(viewport_size.y * 0.09, 56.0, 72.0)
@@ -825,6 +871,24 @@ func _update_browser_layout_metrics(animate: bool = false) -> void:
 	_browser_grid.columns = 2 if browser_content_width >= two_column_width else 1
 	if animate:
 		_set_browser_open(_browser_open, true)
+
+func _queue_browser_layout_refresh() -> void:
+	call_deferred("_refresh_browser_layout")
+
+func _refresh_browser_layout() -> void:
+	if _inventory_panel == null or _browser_layout == null or _browser_scroll == null or _browser_grid == null:
+		return
+
+	_browser_grid.queue_sort()
+	_browser_grid.update_minimum_size()
+	_browser_scroll.update_minimum_size()
+	_browser_layout.queue_sort()
+	_browser_layout.update_minimum_size()
+	_inventory_panel.update_minimum_size()
+	_update_browser_layout_metrics(false)
+	var browser_scroll_bar := _browser_scroll.get_v_scroll_bar()
+	if browser_scroll_bar != null:
+		browser_scroll_bar.update_minimum_size()
 
 func _update_browser_toggle_button_visual() -> void:
 	if _browser_toggle_button == null:
@@ -975,7 +1039,7 @@ func _active_preview_is_support_surface_placeable() -> bool:
 	return _is_support_surface_placeable(_preview_item)
 
 func _can_rotate_preview() -> bool:
-	return _preview_item != null and _preview_item.supports_rotation()
+	return _preview_item != null and _preview_item.supports_rotation() and not _active_preview_is_wall_placeable()
 
 func _is_edit_mode() -> bool:
 	return _editor_mode == EDITOR_MODE_EDIT
@@ -1731,11 +1795,87 @@ func _on_mode_button_pressed(mode_id: String) -> void:
 	_update_grid_visibility()
 
 func _on_grid_toggle_button_pressed() -> void:
-	if _is_edit_mode():
+	_set_grid_placement_enabled(not _grid_placement_enabled)
+
+func _on_rotation_toggle_button_pressed() -> void:
+	_set_rotation_snap_enabled(not _rotation_snap_enabled)
+
+func _set_grid_placement_enabled(enabled: bool) -> void:
+	if _grid_placement_enabled == enabled:
 		return
-	_manual_grid_visible = not _manual_grid_visible
+
+	_grid_placement_enabled = enabled
+	if _placement_active and _preview_item != null:
+		_set_preview_position(_preview_item.global_position)
+		if _drag_mode == "":
+			_hover_target = _pick_interaction_target(get_viewport().get_mouse_position())
+	_popup_visual_signature = ""
 	_update_grid_visibility()
 	_update_inventory_ui()
+	_update_status_text()
+	_update_popup_visuals()
+
+func _set_rotation_snap_enabled(enabled: bool) -> void:
+	if _rotation_snap_enabled == enabled:
+		return
+
+	_rotation_snap_enabled = enabled
+	if _placement_active and _preview_item != null and _can_rotate_preview():
+		_preview_item.rotation.y = _resolve_preview_rotation(_preview_item.rotation.y)
+		if _grid_placement_enabled:
+			_refresh_preview_validity()
+		else:
+			_set_preview_position(_preview_item.global_position)
+	_popup_visual_signature = ""
+	_update_inventory_ui()
+	_update_status_text()
+	_update_popup_visuals()
+
+func _get_placement_mode_label() -> String:
+	return "Grid placement" if _grid_placement_enabled else "Free placement"
+
+func _get_placement_mode_sentence() -> String:
+	return "%s is on." % _get_placement_mode_label()
+
+func _get_clear_space_label() -> String:
+	return "cell" if _grid_placement_enabled else "spot"
+
+func _get_popup_mode_hint() -> String:
+	return "Grid snap on" if _grid_placement_enabled else "Free placement"
+
+func _get_rotation_mode_label() -> String:
+	return "Rotation snap" if _rotation_snap_enabled else "Smooth rotation"
+
+func _get_rotation_mode_sentence() -> String:
+	return "%s is on." % _get_rotation_mode_label()
+
+func _get_rotation_popup_hint() -> String:
+	return "90deg rotate" if _rotation_snap_enabled else "Smooth rotate"
+
+func _get_rotation_status_action() -> String:
+	return "rotate with Q/E" if _rotation_snap_enabled else "fine-tune the angle with Q/E"
+
+func _get_rotation_step() -> float:
+	return ROTATION_SNAP_STEP if _rotation_snap_enabled else SMOOTH_ROTATION_KEY_STEP
+
+func _resolve_preview_rotation(target_rotation_y: float) -> float:
+	if _preview_item == null:
+		return target_rotation_y
+	if _active_preview_is_wall_placeable():
+		return RoomConstants.get_wall_rotation(_active_surface_name) + _preview_item.get_wall_rotation_offset()
+	if _rotation_snap_enabled:
+		return round(target_rotation_y / ROTATION_SNAP_STEP) * ROTATION_SNAP_STEP
+	return snappedf(target_rotation_y, SMOOTH_ROTATION_PRECISION_STEP)
+
+func _apply_preview_rotation(target_rotation_y: float) -> void:
+	if not _can_rotate_preview():
+		return
+
+	_preview_item.rotation.y = _resolve_preview_rotation(target_rotation_y)
+	if _grid_placement_enabled:
+		_refresh_preview_validity()
+	else:
+		_set_preview_position(_preview_item.global_position)
 
 func _on_floor_style_button_pressed(style_id: int) -> void:
 	if _room_shell == null:
@@ -1836,7 +1976,7 @@ func set_debug_world_active(active: bool) -> void:
 	if _gizmo_root != null:
 		_gizmo_root.visible = false
 	if _grid_overlay != null:
-		_grid_overlay.visible = not active and _manual_grid_visible
+		_grid_overlay.visible = false
 	if _placed_items_root != null:
 		_placed_items_root.visible = not active
 	if not active:
@@ -1870,11 +2010,10 @@ func _update_preview_from_mouse(use_current_mouse: bool) -> void:
 	_set_preview_position(target_position)
 
 func _rotate_preview(direction: int) -> void:
-	if _preview_item == null or not _preview_item.supports_rotation():
+	if not _can_rotate_preview():
 		return
 
-	_preview_item.rotate_y(deg_to_rad(90.0 * float(direction)))
-	_refresh_preview_validity()
+	_apply_preview_rotation(_preview_item.rotation.y + _get_rotation_step() * float(direction))
 
 func _evaluate_preview_transform() -> Dictionary:
 	if _active_preview_is_support_surface_placeable():
@@ -1885,7 +2024,8 @@ func _evaluate_preview_transform() -> Dictionary:
 		_preview_item,
 		_active_surface_name,
 		_placement_query_shape,
-		_get_preview_excluded_rids()
+		_get_preview_excluded_rids(),
+		not _grid_placement_enabled or not _rotation_snap_enabled
 	)
 
 func _evaluate_support_surface_preview_transform() -> Dictionary:
@@ -1901,7 +2041,7 @@ func _evaluate_support_surface_preview_transform() -> Dictionary:
 	var center_offset := support_surface.get("center_offset", Vector3.ZERO) as Vector3
 	var half_extents := support_surface.get("half_extents", Vector2.ZERO) as Vector2
 	var local_offset := _preview_item.position - center_offset
-	var item_half_extents := _get_rotated_planar_half_extents(_preview_item.get_footprint_half_extents(), _preview_item.rotation.y)
+	var item_half_extents := PlacementSurfaceQueries.get_rotated_planar_half_extents(_preview_item.get_footprint_half_extents(), _preview_item.rotation.y)
 	if absf(local_offset.x) + item_half_extents.x > half_extents.x + 0.001:
 		return {"valid": false, "code": "bounds", "reason": "Too close to surface edge"}
 	if absf(local_offset.z) + item_half_extents.y > half_extents.y + 0.001:
@@ -1947,23 +2087,27 @@ func _refresh_preview_validity() -> void:
 	_update_status_text()
 
 func _update_inventory_ui() -> void:
-	var grid_visible := _manual_grid_visible or _placement_active or _is_edit_mode()
 	_update_browser_mode_ui()
 	_rebuild_item_browser()
 	_update_section_toggle_ui()
 	if _browser_search_input != null:
 		_browser_search_input.editable = not _placement_active
 	if _grid_toggle_button != null:
-		if _is_edit_mode():
-			_grid_toggle_button.text = "Grid Overlay: On (Edit Mode)"
-			_grid_toggle_button.disabled = true
-		else:
-			_grid_toggle_button.text = "Grid Overlay: %s" % ("On" if grid_visible else "Off")
-			_grid_toggle_button.disabled = false
+		_grid_toggle_button.text = "Grid Placement: %s" % ("On" if _grid_placement_enabled else "Off")
+		_grid_toggle_button.disabled = false
 		PlacementUiStyles.apply_button_style(
 			_grid_toggle_button,
-			PlacementUiStyles.COLOR_PANEL_ALT,
-			PlacementUiStyles.COLOR_BORDER,
+			PlacementUiStyles.COLOR_ACCENT_DARK if _grid_placement_enabled else PlacementUiStyles.COLOR_PANEL_ALT,
+			PlacementUiStyles.COLOR_ACCENT_BRIGHT if _grid_placement_enabled else PlacementUiStyles.COLOR_BORDER,
+			PlacementUiStyles.COLOR_TEXT
+		)
+	if _rotation_toggle_button != null:
+		_rotation_toggle_button.text = "Rotation Snap: %s" % ("On" if _rotation_snap_enabled else "Off")
+		_rotation_toggle_button.disabled = false
+		PlacementUiStyles.apply_button_style(
+			_rotation_toggle_button,
+			PlacementUiStyles.COLOR_ACCENT_DARK if _rotation_snap_enabled else PlacementUiStyles.COLOR_PANEL_ALT,
+			PlacementUiStyles.COLOR_ACCENT_BRIGHT if _rotation_snap_enabled else PlacementUiStyles.COLOR_BORDER,
 			PlacementUiStyles.COLOR_TEXT
 		)
 	if _save_button != null:
@@ -2002,6 +2146,7 @@ func _update_inventory_ui() -> void:
 		_status_shell.visible = _placement_active or _is_edit_mode() or not _has_any_stock()
 	if _inventory_panel != null:
 		PlacementUiStyles.apply_panel_style(_inventory_panel, PlacementUiStyles.COLOR_PANEL, PlacementUiStyles.COLOR_BORDER, 1, 18, 10, 0.24)
+	_queue_browser_layout_refresh()
 
 func _update_mode_ui() -> void:
 	for mode_id in _mode_buttons.keys():
@@ -2091,37 +2236,40 @@ func _update_status_text() -> void:
 	if _status_label == null:
 		return
 
+	var mode_sentence := _get_placement_mode_sentence()
+	var rotation_sentence := _get_rotation_mode_sentence()
+	var rotation_action := _get_rotation_status_action()
 	if _placement_active:
 		var target_surface_name := "furniture surface" if _active_preview_is_support_surface_placeable() else ("ceiling" if _active_preview_is_ceiling_placeable() else ("wall" if _active_preview_is_wall_placeable() else "floor"))
 		if _placement_valid:
 			match _placement_session:
 				PLACEMENT_SESSION_EDIT:
 					if _active_preview_is_wall_placeable():
-						_status_label.text = "Editing %s on the wall.\nDrag the item itself to move it across the wall. Duplicate and Delete are available while editing." % _get_active_item_display_name()
+						_status_label.text = "Editing %s on the wall.\n%s Drag the item itself to move it across the wall. Duplicate and Delete are available while editing." % [_get_active_item_display_name(), mode_sentence]
 					elif _active_preview_is_ceiling_placeable():
-						_status_label.text = "Editing %s on the ceiling.\nDrag the item itself, use the gizmo, or rotate with Q/E." % _get_active_item_display_name()
+						_status_label.text = "Editing %s on the ceiling.\n%s %s Drag the item itself, use the gizmo, or %s." % [_get_active_item_display_name(), mode_sentence, rotation_sentence, rotation_action]
 					elif _active_preview_is_support_surface_placeable():
-						_status_label.text = "Editing %s on a furniture surface.\nDrag the item itself across the surface, then rotate with Q/E if needed." % _get_active_item_display_name()
+						_status_label.text = "Editing %s on a furniture surface.\n%s %s Drag the item itself across the surface, then %s if needed." % [_get_active_item_display_name(), mode_sentence, rotation_sentence, rotation_action]
 					else:
-						_status_label.text = "Editing %s.\nDrag the item itself, use the gizmo, or orbit with left-drag on empty space. Duplicate and Delete are available while editing." % _get_active_item_display_name()
+						_status_label.text = "Editing %s.\n%s Drag the item itself, use the gizmo, or orbit with left-drag on empty space. Duplicate and Delete are available while editing." % [_get_active_item_display_name(), mode_sentence]
 				PLACEMENT_SESSION_DUPLICATE:
 					if _active_preview_is_wall_placeable():
-						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new wall spot, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\n%s Drag the item to a new wall spot, then confirm to keep both copies." % [_get_active_item_display_name(), mode_sentence]
 					elif _active_preview_is_ceiling_placeable():
-						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new ceiling spot, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\n%s %s Drag the item to a new ceiling spot, then confirm to keep both copies." % [_get_active_item_display_name(), mode_sentence, rotation_sentence]
 					elif _active_preview_is_support_surface_placeable():
-						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new spot on a table, shelf, or cabinet top, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\n%s %s Drag the item to a new spot on a table, shelf, or cabinet top, then confirm to keep both copies." % [_get_active_item_display_name(), mode_sentence, rotation_sentence]
 					else:
-						_status_label.text = "Ready to place a duplicate of %s.\nDrag the item to a new floor spot, then confirm to keep both copies." % _get_active_item_display_name()
+						_status_label.text = "Ready to place a duplicate of %s.\n%s %s Drag the item to a new floor spot, then confirm to keep both copies." % [_get_active_item_display_name(), mode_sentence, rotation_sentence]
 				_:
 					if _active_preview_is_wall_placeable():
-						_status_label.text = "Ready to place %s.\nDrag the item onto the wall, then confirm. This item cuts a window opening into the wall." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\n%s Drag the item onto the wall, then confirm. This item cuts a window opening into the wall." % [_get_active_item_display_name(), mode_sentence]
 					elif _active_preview_is_ceiling_placeable():
-						_status_label.text = "Ready to place %s.\nDrag the item onto the ceiling, then rotate with Q/E if needed." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\n%s %s Drag the item onto the ceiling, then %s if needed." % [_get_active_item_display_name(), mode_sentence, rotation_sentence, rotation_action]
 					elif _active_preview_is_support_surface_placeable():
-						_status_label.text = "Ready to place %s.\nDrag the item across a flat table, shelf, or cabinet top, then rotate with Q/E if needed." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\n%s %s Drag the item across a flat table, shelf, or cabinet top, then %s if needed." % [_get_active_item_display_name(), mode_sentence, rotation_sentence, rotation_action]
 					else:
-						_status_label.text = "Ready to place %s.\nLeft-drag the item, use the gizmo handles, or orbit with left-drag on empty space. Q/E still rotates." % _get_active_item_display_name()
+						_status_label.text = "Ready to place %s.\n%s %s Left-drag the item, use the gizmo handles, or orbit with left-drag on empty space. You can %s." % [_get_active_item_display_name(), mode_sentence, rotation_sentence, rotation_action]
 		else:
 			match _placement_issue_code:
 				"bounds":
@@ -2136,27 +2284,29 @@ func _update_status_text() -> void:
 				"surface":
 					_status_label.text = "Point at the visible %s.\nThis item can only be placed on its supported mount surface." % target_surface_name
 				"occupied":
-					_status_label.text = "Blocked by another placed item.\nMove to a clear cell, or press X / Esc to cancel."
+					_status_label.text = "Blocked by another placed item.\nMove to a clear %s, or press X / Esc to cancel." % _get_clear_space_label()
 				_:
 					_status_label.text = "Blocked placement.\nMove away from walls or another item, or press X / Esc to cancel."
 		return
 
 	if _is_edit_mode():
-		_status_label.text = "Edit mode is active.\nDouble-click any placed furniture to move it. The grid stays on automatically while editing."
+		_status_label.text = "Edit mode is active.\nDouble-click any placed furniture to move it. %s and %s will be used for the next edit." % [_get_placement_mode_label(), _get_rotation_mode_label()]
 		return
 
 	if not _has_any_stock():
 		_status_label.text = "No available inventory stock right now.\nOpen Shop to buy more items, or switch to Edit to move what is already placed."
 		return
 
-	_status_label.text = "Choose an owned item from Inventory to place it.\nOpen Shop to buy more furniture. The dotted grid will turn on automatically while placing."
+	_status_label.text = "Choose an owned item from Inventory to place it.\nOpen Shop to buy more furniture. %s and %s are ready for the next placement." % [_get_placement_mode_label(), _get_rotation_mode_label()]
 
 func _update_grid_visibility() -> void:
 	if _grid_overlay == null:
 		return
 
 	_refresh_grid_overlay_transform()
-	_grid_overlay.visible = (_manual_grid_visible or _placement_active or _is_edit_mode()) and not (_placement_active and _active_preview_is_support_surface_placeable())
+	_grid_overlay.visible = _grid_placement_enabled \
+		and (_placement_active or _is_edit_mode()) \
+		and not (_placement_active and _active_preview_is_support_surface_placeable())
 
 func _refresh_grid_overlay_transform() -> void:
 	if _grid_overlay == null or _room_shell == null:
@@ -2232,7 +2382,10 @@ func _pick_interaction_target(mouse_position: Vector2) -> String:
 		if not gizmo_hit.is_empty():
 			var gizmo_collider := gizmo_hit.get("collider") as CollisionObject3D
 			if gizmo_collider != null and gizmo_collider.has_meta("handle_id"):
-				return String(gizmo_collider.get_meta("handle_id"))
+				var handle_id := String(gizmo_collider.get_meta("handle_id"))
+				if handle_id == "rotate" and not _can_rotate_preview():
+					return ""
+				return handle_id
 
 	var preview_hit := _raycast_from_mouse(mouse_position, SimpleWoodChair.PREVIEW_PICK_LAYER)
 	if not preview_hit.is_empty():
@@ -2295,13 +2448,15 @@ func _update_drag(mouse_position: Vector2) -> void:
 			if z_hit.get("valid", false):
 				_set_preview_position(_project_point_onto_drag_axis(z_hit["position"] as Vector3, "axis_z"))
 		"rotate":
-			if _active_preview_is_wall_placeable():
+			if _active_preview_is_wall_placeable() or not _can_rotate_preview():
 				return
 			var current_angle := _get_active_plane_angle_around_preview(mouse_position)
 			var delta_angle := wrapf(current_angle - _drag_rotation_start_angle, -PI, PI)
-			var rotation_steps: float = round(delta_angle / ROTATION_SNAP_STEP)
-			_preview_item.rotation.y = _drag_start_rotation_y + rotation_steps * ROTATION_SNAP_STEP
-			_refresh_preview_validity()
+			var next_rotation := _drag_start_rotation_y + delta_angle
+			if _rotation_snap_enabled:
+				var rotation_steps: float = round(delta_angle / ROTATION_SNAP_STEP)
+				next_rotation = _drag_start_rotation_y + rotation_steps * ROTATION_SNAP_STEP
+			_apply_preview_rotation(next_rotation)
 
 func _end_drag() -> void:
 	_drag_mode = ""
@@ -2309,20 +2464,23 @@ func _end_drag() -> void:
 	_update_gizmo_hover_state()
 
 func _set_preview_position(target_position: Vector3) -> void:
+	if _preview_item == null:
+		return
+
 	if _active_preview_is_wall_placeable():
-		_preview_item.global_position = _snap_wall_position(target_position)
+		_preview_item.global_position = _resolve_wall_preview_position(target_position)
 		_preview_item.rotation.y = RoomConstants.get_wall_rotation(_active_surface_name) + _preview_item.get_wall_rotation_offset()
 		_sync_room_wall_openings()
 	elif _active_preview_is_ceiling_placeable():
-		_preview_item.global_position = _snap_ceiling_position(target_position)
+		_preview_item.global_position = _resolve_planar_preview_position(target_position, RoomConstants.CEILING_SURFACE)
 	elif _active_preview_is_support_surface_placeable():
 		var support_surface := _get_active_support_surface_data()
 		if _active_support_host != null and not support_surface.is_empty():
 			if _preview_item.get_parent() != _active_support_host:
 				_preview_item.reparent(_active_support_host, true)
-			_preview_item.position = _snap_support_surface_local_position(_active_support_host, support_surface, target_position)
+			_preview_item.position = _resolve_support_surface_local_position(_active_support_host, support_surface, target_position)
 	else:
-		_preview_item.global_position = _snap_position_to_grid(target_position)
+		_preview_item.global_position = _resolve_planar_preview_position(target_position, RoomConstants.FLOOR_SURFACE)
 	_refresh_preview_validity()
 
 func _apply_preview_surface_hit(hit: Dictionary) -> void:
@@ -2368,15 +2526,21 @@ func _get_support_surface_hosts() -> Array[SimpleWoodChair]:
 		hosts.append(placeable)
 	return hosts
 
-func _get_rotated_planar_half_extents(half_extents: Vector2, rotation_y: float) -> Vector2:
-	var cosine := absf(cos(rotation_y))
-	var sine := absf(sin(rotation_y))
-	return Vector2(
-		cosine * half_extents.x + sine * half_extents.y,
-		sine * half_extents.x + cosine * half_extents.y
-	)
+func _resolve_planar_preview_position(target_position: Vector3, surface_name: String) -> Vector3:
+	if _grid_placement_enabled:
+		return _snap_planar_position(target_position, surface_name)
+	if _preview_item == null:
+		return target_position
 
-func _snap_support_surface_local_position(host: SimpleWoodChair, support_surface: Dictionary, target_world_position: Vector3) -> Vector3:
+	var item_half_extents := PlacementSurfaceQueries.get_rotated_planar_half_extents(_preview_item.get_footprint_half_extents(), _preview_item.rotation.y)
+	return PlacementSurfaceQueries.clamp_planar_position(_room_shell, target_position, surface_name, item_half_extents)
+
+func _resolve_wall_preview_position(target_position: Vector3) -> Vector3:
+	if _grid_placement_enabled:
+		return _snap_wall_position(target_position)
+	return PlacementSurfaceQueries.clamp_wall_position(_room_shell, _active_surface_name, target_position, _preview_item)
+
+func _resolve_support_surface_local_position(host: SimpleWoodChair, support_surface: Dictionary, target_world_position: Vector3) -> Vector3:
 	if host == null or support_surface.is_empty() or _preview_item == null:
 		return Vector3.ZERO
 
@@ -2384,15 +2548,18 @@ func _snap_support_surface_local_position(host: SimpleWoodChair, support_surface
 	var half_extents := support_surface.get("half_extents", Vector2.ZERO) as Vector2
 	var local_target := host.to_local(target_world_position)
 	var local_offset := local_target - center_offset
-	var item_half_extents := _get_rotated_planar_half_extents(_preview_item.get_footprint_half_extents(), _preview_item.rotation.y)
+	var item_half_extents := PlacementSurfaceQueries.get_rotated_planar_half_extents(_preview_item.get_footprint_half_extents(), _preview_item.rotation.y)
 	var available_x := maxf(0.0, half_extents.x - item_half_extents.x)
 	var available_z := maxf(0.0, half_extents.y - item_half_extents.y)
-	var snapped_x := clampf(round(local_offset.x / SUPPORT_SURFACE_SNAP_SIZE) * SUPPORT_SURFACE_SNAP_SIZE, -available_x, available_x)
-	var snapped_z := clampf(round(local_offset.z / SUPPORT_SURFACE_SNAP_SIZE) * SUPPORT_SURFACE_SNAP_SIZE, -available_z, available_z)
+	var resolved_x := clampf(local_offset.x, -available_x, available_x)
+	var resolved_z := clampf(local_offset.z, -available_z, available_z)
+	if _grid_placement_enabled:
+		resolved_x = clampf(round(resolved_x / SUPPORT_SURFACE_SNAP_SIZE) * SUPPORT_SURFACE_SNAP_SIZE, -available_x, available_x)
+		resolved_z = clampf(round(resolved_z / SUPPORT_SURFACE_SNAP_SIZE) * SUPPORT_SURFACE_SNAP_SIZE, -available_z, available_z)
 	return Vector3(
-		center_offset.x + snapped_x,
+		center_offset.x + resolved_x,
 		center_offset.y + SUPPORT_SURFACE_CLEARANCE,
-		center_offset.z + snapped_z
+		center_offset.z + resolved_z
 	)
 
 func _try_get_support_surface_hit(mouse_position: Vector2) -> Dictionary:
@@ -2461,9 +2628,9 @@ func _find_nearest_support_surface_hit() -> Dictionary:
 			if camera.is_position_behind(surface_center):
 				continue
 
-			var snapped_local := _snap_support_surface_local_position(host, support_surface, surface_center)
-			var snapped_world := host.to_global(snapped_local)
-			var camera_distance := camera.global_position.distance_squared_to(snapped_world)
+			var resolved_local := _resolve_support_surface_local_position(host, support_surface, surface_center)
+			var resolved_world := host.to_global(resolved_local)
+			var camera_distance := camera.global_position.distance_squared_to(resolved_world)
 			if camera_distance >= best_score:
 				continue
 
@@ -2472,7 +2639,7 @@ func _find_nearest_support_surface_hit() -> Dictionary:
 				"valid": true,
 				"surface_name": RoomConstants.MOUNT_SURFACE,
 				"distance": sqrt(camera_distance),
-				"position": snapped_world,
+				"position": resolved_world,
 				"host": host,
 				"surface_id": String(support_surface.get("id", DEFAULT_SUPPORT_SURFACE_ID)),
 			}
@@ -2641,7 +2808,7 @@ func _update_popup_visuals() -> void:
 	var panel_border: Color
 	var status_color: Color
 	var popup_status_text := "Ready"
-	var popup_hint_text := "LMB drag  |  Q/E rotate"
+	var popup_hint_text := "LMB drag  |  %s  |  %s" % [_get_popup_mode_hint(), _get_rotation_popup_hint()]
 	if _placement_valid:
 		panel_bg = PlacementUiStyles.COLOR_PANEL_SOFT
 		panel_border = PlacementUiStyles.COLOR_SUCCESS_BORDER
@@ -2651,21 +2818,23 @@ func _update_popup_visuals() -> void:
 		panel_border = PlacementUiStyles.COLOR_DANGER_BORDER
 		status_color = PlacementUiStyles.COLOR_TEXT
 		popup_status_text = _placement_issue_text
-		popup_hint_text = "Move to a clear cell"
+		popup_hint_text = "Move to a clear %s" % _get_clear_space_label()
 
 	var confirm_text := "Move" if _is_edit_session() else "Place"
 	var confirm_tooltip := "Confirm the current %s" % ("move" if _is_edit_session() else "placement")
 	var cancel_tooltip := "Cancel the current action"
+	var popup_mode_hint := _get_popup_mode_hint()
+	var rotation_popup_hint := _get_rotation_popup_hint()
 
 	if _placement_valid:
 		if _active_preview_is_wall_placeable():
-			popup_hint_text = "Drag on wall  |  Double-click to edit" if not _is_edit_session() else "Drag on wall  |  Duplicate/Delete"
+			popup_hint_text = ("Drag on wall  |  %s" % popup_mode_hint) if not _is_edit_session() else ("Drag on wall  |  %s  |  Duplicate/Delete" % popup_mode_hint)
 		elif _active_preview_is_ceiling_placeable():
-			popup_hint_text = "Drag on ceiling  |  Q/E rotate" if not _is_edit_session() else "Drag on ceiling  |  Q/E rotate  |  Duplicate/Delete"
+			popup_hint_text = ("Drag on ceiling  |  %s  |  %s" % [popup_mode_hint, rotation_popup_hint]) if not _is_edit_session() else ("Drag on ceiling  |  %s  |  %s  |  Duplicate/Delete" % [popup_mode_hint, rotation_popup_hint])
 		elif _active_preview_is_support_surface_placeable():
-			popup_hint_text = "Drag on furniture top  |  Q/E rotate" if not _is_edit_session() else "Drag on furniture top  |  Q/E rotate  |  Duplicate/Delete"
+			popup_hint_text = ("Drag on furniture top  |  %s  |  %s" % [popup_mode_hint, rotation_popup_hint]) if not _is_edit_session() else ("Drag on furniture top  |  %s  |  %s  |  Duplicate/Delete" % [popup_mode_hint, rotation_popup_hint])
 		else:
-			popup_hint_text = "LMB drag  |  Q/E rotate" if not _is_edit_session() else "LMB drag  |  Q/E rotate  |  Duplicate/Delete"
+			popup_hint_text = ("LMB drag  |  %s  |  %s" % [popup_mode_hint, rotation_popup_hint]) if not _is_edit_session() else ("LMB drag  |  %s  |  %s  |  Duplicate/Delete" % [popup_mode_hint, rotation_popup_hint])
 
 	var popup_visual_signature := JSON.stringify({
 		"valid": _placement_valid,
@@ -2675,6 +2844,8 @@ func _update_popup_visuals() -> void:
 		"edit": _is_edit_session(),
 		"duplicate_enabled": duplicate_enabled,
 		"delete_enabled": delete_enabled,
+		"grid_placement_enabled": _grid_placement_enabled,
+		"rotation_snap_enabled": _rotation_snap_enabled,
 		"wall": _active_preview_is_wall_placeable(),
 		"ceiling": _active_preview_is_ceiling_placeable(),
 		"support_surface": _active_preview_is_support_surface_placeable(),

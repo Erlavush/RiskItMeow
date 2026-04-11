@@ -60,6 +60,8 @@ const WALL_GUIDE_HIDDEN_ALPHA := 0.0
 const GIZMO_DISTANCE_SCALE := 0.08
 const GIZMO_MIN_SCALE := 0.92
 const GIZMO_MAX_SCALE := 1.36
+const GIZMO_DRAG_SENSITIVITY := 0.01
+const GIZMO_YAW_DRAG_SENSITIVITY := 0.35
 const TUNING_SCALE_MIN := 0.01
 const TUNING_SCALE_MAX := 6.0
 const TUNING_DIMENSION_MAX := 12.0
@@ -167,6 +169,8 @@ var _visual_yaw_spin_box: SpinBox
 var _collision_size_spin_boxes: Array[SpinBox] = []
 var _collision_offset_spin_boxes: Array[SpinBox] = []
 var _footprint_spin_boxes: Array[SpinBox] = []
+var _support_surface_offset_spin_boxes: Array[SpinBox] = []
+var _support_surface_size_spin_boxes: Array[SpinBox] = []
 var _wall_bounds_spin_boxes: Array[SpinBox] = []
 var _wall_opening_spin_boxes: Array[SpinBox] = []
 var _can_host_surface_button: CheckButton
@@ -620,6 +624,13 @@ func _build_edit_panel() -> void:
 	PlacementUiStyles.apply_check_button_style(_can_host_surface_button)
 	properties_layout.add_child(_can_host_surface_button)
 
+	var support_hint = Label.new()
+	support_hint.text = "Support Offset and Support Area define the live tabletop or shelf zone used by surface decor."
+	support_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	support_hint.add_theme_font_size_override("font_size", 10)
+	PlacementUiStyles.apply_label_style(support_hint, PlacementUiStyles.COLOR_TEXT_MUTED)
+	properties_layout.add_child(support_hint)
+
 	_requires_wall_opening_button = CheckButton.new()
 	_requires_wall_opening_button.text = "Requires wall opening"
 	_requires_wall_opening_button.toggled.connect(_on_boolean_property_changed)
@@ -632,6 +643,8 @@ func _build_edit_panel() -> void:
 	_collision_size_spin_boxes = _build_vector_row(properties_layout, "Collision Size", ["W", "H", "D"], TUNING_SCALE_MIN, TUNING_DIMENSION_MAX, TUNING_FINE_STEP)
 	_collision_offset_spin_boxes = _build_vector_row(properties_layout, "Collision Offset", ["X", "Y", "Z"], -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX, TUNING_FINE_STEP)
 	_footprint_spin_boxes = _build_vector_row(properties_layout, "Footprint", ["W", "D"], 0.0, TUNING_DIMENSION_MAX, TUNING_FINE_STEP)
+	_support_surface_offset_spin_boxes = _build_vector_row(properties_layout, "Support Offset", ["X", "Y", "Z"], -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX, TUNING_FINE_STEP)
+	_support_surface_size_spin_boxes = _build_vector_row(properties_layout, "Support Area", ["W", "D"], 0.0, TUNING_DIMENSION_MAX, TUNING_FINE_STEP)
 	_wall_bounds_spin_boxes = _build_vector_row(properties_layout, "Wall Bounds", ["W", "H"], 0.0, TUNING_DIMENSION_MAX, TUNING_FINE_STEP)
 	_wall_opening_spin_boxes = _build_vector_row(properties_layout, "Wall Opening", ["W", "H"], 0.0, TUNING_DIMENSION_MAX, TUNING_FINE_STEP)
 
@@ -857,8 +870,9 @@ func _clear_current_item() -> void:
 	_update_stage_guides()
 	_update_ui()
 
-func _destroy_current_item() -> void:
-	_end_gizmo_drag()
+func _destroy_current_item(preserve_gizmo_drag: bool = false) -> void:
+	if not preserve_gizmo_drag:
+		_end_gizmo_drag()
 	_clear_gizmo_handles()
 	if _current_item != null and _current_item.get_parent() != null:
 		_current_item.get_parent().remove_child(_current_item)
@@ -875,8 +889,8 @@ func _destroy_current_item() -> void:
 	_support_overlay_root = null
 	_item_holder.rotation = Vector3.ZERO
 
-func _rebuild_current_item(item_def: Dictionary, reset_camera: bool) -> void:
-	_destroy_current_item()
+func _rebuild_current_item(item_def: Dictionary, reset_camera: bool, preserve_gizmo_drag: bool = false) -> void:
+	_destroy_current_item(preserve_gizmo_drag)
 	if item_def.is_empty():
 		_update_ui()
 		return
@@ -1258,6 +1272,50 @@ func _begin_gizmo_drag(handle_id: String, mouse_position: Vector2) -> void:
 			_gizmo_drag_start_values["wall_opening"] = _read_spin_box_vector2(_wall_opening_spin_boxes, 0.0)
 	get_viewport().gui_release_focus()
 
+func _get_gizmo_handle_screen_axis(handle_id: String) -> Vector2:
+	if _camera == null or _gizmo_root == null:
+		return Vector2.ZERO
+
+	var local_axis := Vector3.ZERO
+	match handle_id:
+		"scale", "lift", "y":
+			local_axis = Vector3.UP
+		"x":
+			local_axis = Vector3.RIGHT
+		"z":
+			local_axis = Vector3.BACK
+		_:
+			return Vector2.ZERO
+
+	var origin_world := _gizmo_root.global_position
+	var axis_world := _gizmo_root.global_basis.orthonormalized() * local_axis
+	var axis_tip_world := origin_world + axis_world
+	var origin_screen := _camera.unproject_position(origin_world)
+	var axis_tip_screen := _camera.unproject_position(axis_tip_world)
+	var screen_axis := axis_tip_screen - origin_screen
+	if screen_axis.length_squared() <= 0.0001:
+		return Vector2.ZERO
+	return screen_axis.normalized()
+
+func _get_signed_gizmo_drag_delta(mouse_position: Vector2) -> float:
+	var mouse_delta := mouse_position - _gizmo_drag_start_mouse
+	if _gizmo_mode == GIZMO_MODE_VISUAL_YAW:
+		return mouse_delta.x * GIZMO_YAW_DRAG_SENSITIVITY
+
+	var screen_axis := _get_gizmo_handle_screen_axis(_gizmo_drag_handle_id)
+	if screen_axis.length_squared() <= 0.0001:
+		match _gizmo_drag_handle_id:
+			"scale", "lift", "y":
+				return -mouse_delta.y * GIZMO_DRAG_SENSITIVITY
+			"x":
+				return mouse_delta.x * GIZMO_DRAG_SENSITIVITY
+			"z":
+				return -mouse_delta.y * GIZMO_DRAG_SENSITIVITY
+			_:
+				return 0.0
+
+	return mouse_delta.dot(screen_axis) * GIZMO_DRAG_SENSITIVITY
+
 func _end_gizmo_drag() -> void:
 	_gizmo_drag_active = false
 	_gizmo_drag_handle_id = ""
@@ -1267,65 +1325,62 @@ func _update_gizmo_drag(mouse_position: Vector2) -> void:
 	if not _gizmo_drag_active or _camera == null:
 		return
 
-	var delta = mouse_position - _gizmo_drag_start_mouse
-	var scaled_delta = delta.length() * 0.01
-	if delta.x + delta.y < 0.0:
-		scaled_delta *= -1.0
+	var signed_drag_delta := _get_signed_gizmo_drag_delta(mouse_position)
 
 	_syncing_controls = true
 	match _gizmo_mode:
 		GIZMO_MODE_VISUAL_SCALE:
 			var start_scale = _gizmo_drag_start_values.get("visual_scale", Vector3.ONE) as Vector3
-			var next_scale = start_scale + Vector3.ONE * scaled_delta
+			var next_scale = start_scale + Vector3.ONE * signed_drag_delta
 			next_scale.x = clampf(next_scale.x, TUNING_SCALE_MIN, TUNING_SCALE_MAX)
 			next_scale.y = clampf(next_scale.y, TUNING_SCALE_MIN, TUNING_SCALE_MAX)
 			next_scale.z = clampf(next_scale.z, TUNING_SCALE_MIN, TUNING_SCALE_MAX)
 			_set_vector3_spin_boxes(_visual_scale_spin_boxes, next_scale)
 		GIZMO_MODE_VISUAL_LIFT:
 			var start_lift = float(_gizmo_drag_start_values.get("visual_lift", 0.0))
-			_visual_lift_spin_box.value = clampf(start_lift + scaled_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
+			_visual_lift_spin_box.value = clampf(start_lift + signed_drag_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
 		GIZMO_MODE_VISUAL_YAW:
 			var start_yaw = float(_gizmo_drag_start_values.get("visual_yaw", 0.0))
-			_visual_yaw_spin_box.value = clampf(start_yaw + delta.x * 0.35, TUNING_YAW_MIN, TUNING_YAW_MAX)
+			_visual_yaw_spin_box.value = clampf(start_yaw + signed_drag_delta, TUNING_YAW_MIN, TUNING_YAW_MAX)
 		GIZMO_MODE_COLLISION_SIZE:
 			var start_collision = _gizmo_drag_start_values.get("collision_size", Vector3.ONE) as Vector3
 			match _gizmo_drag_handle_id:
 				"x":
-					_collision_size_spin_boxes[0].value = clampf(start_collision.x + scaled_delta * 2.0, TUNING_SCALE_MIN, TUNING_DIMENSION_MAX)
+					_collision_size_spin_boxes[0].value = clampf(start_collision.x + signed_drag_delta * 2.0, TUNING_SCALE_MIN, TUNING_DIMENSION_MAX)
 				"y":
-					_collision_size_spin_boxes[1].value = clampf(start_collision.y + scaled_delta * 2.0, TUNING_SCALE_MIN, TUNING_DIMENSION_MAX)
+					_collision_size_spin_boxes[1].value = clampf(start_collision.y + signed_drag_delta * 2.0, TUNING_SCALE_MIN, TUNING_DIMENSION_MAX)
 				"z":
-					_collision_size_spin_boxes[2].value = clampf(start_collision.z + scaled_delta * 2.0, TUNING_SCALE_MIN, TUNING_DIMENSION_MAX)
+					_collision_size_spin_boxes[2].value = clampf(start_collision.z + signed_drag_delta * 2.0, TUNING_SCALE_MIN, TUNING_DIMENSION_MAX)
 		GIZMO_MODE_COLLISION_OFFSET:
 			var start_offset = _gizmo_drag_start_values.get("collision_offset", Vector3.ZERO) as Vector3
 			match _gizmo_drag_handle_id:
 				"x":
-					_collision_offset_spin_boxes[0].value = clampf(start_offset.x + scaled_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
+					_collision_offset_spin_boxes[0].value = clampf(start_offset.x + signed_drag_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
 				"y":
-					_collision_offset_spin_boxes[1].value = clampf(start_offset.y + scaled_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
+					_collision_offset_spin_boxes[1].value = clampf(start_offset.y + signed_drag_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
 				"z":
-					_collision_offset_spin_boxes[2].value = clampf(start_offset.z + scaled_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
+					_collision_offset_spin_boxes[2].value = clampf(start_offset.z + signed_drag_delta, -TUNING_OFFSET_MAX, TUNING_OFFSET_MAX)
 		GIZMO_MODE_FOOTPRINT:
 			var start_footprint = _gizmo_drag_start_values.get("footprint", Vector2.ZERO) as Vector2
 			match _gizmo_drag_handle_id:
 				"x":
-					_footprint_spin_boxes[0].value = clampf(start_footprint.x + scaled_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
+					_footprint_spin_boxes[0].value = clampf(start_footprint.x + signed_drag_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
 				"z":
-					_footprint_spin_boxes[1].value = clampf(start_footprint.y + scaled_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
+					_footprint_spin_boxes[1].value = clampf(start_footprint.y + signed_drag_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
 		GIZMO_MODE_WALL_BOUNDS:
 			var start_wall_bounds = _gizmo_drag_start_values.get("wall_bounds", Vector2.ZERO) as Vector2
 			match _gizmo_drag_handle_id:
 				"x":
-					_wall_bounds_spin_boxes[0].value = clampf(start_wall_bounds.x + scaled_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
+					_wall_bounds_spin_boxes[0].value = clampf(start_wall_bounds.x + signed_drag_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
 				"y":
-					_wall_bounds_spin_boxes[1].value = clampf(start_wall_bounds.y + scaled_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
+					_wall_bounds_spin_boxes[1].value = clampf(start_wall_bounds.y + signed_drag_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
 		GIZMO_MODE_WALL_OPENING:
 			var start_wall_opening = _gizmo_drag_start_values.get("wall_opening", Vector2.ZERO) as Vector2
 			match _gizmo_drag_handle_id:
 				"x":
-					_wall_opening_spin_boxes[0].value = clampf(start_wall_opening.x + scaled_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
+					_wall_opening_spin_boxes[0].value = clampf(start_wall_opening.x + signed_drag_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
 				"y":
-					_wall_opening_spin_boxes[1].value = clampf(start_wall_opening.y + scaled_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
+					_wall_opening_spin_boxes[1].value = clampf(start_wall_opening.y + signed_drag_delta * 2.0, 0.0, TUNING_DIMENSION_MAX)
 	_syncing_controls = false
 	_apply_live_preview()
 
@@ -1525,12 +1580,63 @@ func _update_control_values_from_item_def() -> void:
 	_set_vector3_spin_boxes(_collision_size_spin_boxes, _current_item_def.get("collision_size", Vector3.ONE) as Vector3)
 	_set_vector3_spin_boxes(_collision_offset_spin_boxes, _current_item_def.get("collision_center_offset", Vector3.ZERO) as Vector3)
 	_set_vector2_spin_boxes(_footprint_spin_boxes, (_current_item_def.get("footprint_half_extents", Vector2.ZERO) as Vector2) * 2.0)
+	var primary_support_surface := _get_primary_support_surface()
+	_set_vector3_spin_boxes(_support_surface_offset_spin_boxes, primary_support_surface.get("center_offset", Vector3.ZERO) as Vector3)
+	_set_vector2_spin_boxes(_support_surface_size_spin_boxes, (primary_support_surface.get("half_extents", Vector2.ZERO) as Vector2) * 2.0)
 	_set_vector2_spin_boxes(_wall_bounds_spin_boxes, (_current_item_def.get("wall_half_extents", Vector2.ZERO) as Vector2) * 2.0)
 	_set_vector2_spin_boxes(_wall_opening_spin_boxes, (_current_item_def.get("wall_opening_half_extents", Vector2.ZERO) as Vector2) * 2.0)
-	_can_host_surface_button.button_pressed = bool(_current_item_def.get("can_host_surface_items", false))
+	_can_host_surface_button.button_pressed = not primary_support_surface.is_empty() or bool(_current_item_def.get("can_host_surface_items", false))
 	_requires_wall_opening_button.button_pressed = bool(_current_item_def.get("requires_wall_opening", false))
 
 	_syncing_controls = false
+
+func _get_primary_support_surface() -> Dictionary:
+	if _current_item != null:
+		var live_support_surfaces := _current_item.get_support_surfaces()
+		if not live_support_surfaces.is_empty():
+			var first_surface: Variant = live_support_surfaces[0]
+			if typeof(first_surface) == TYPE_DICTIONARY:
+				return (first_surface as Dictionary).duplicate(true)
+
+	var raw_support_surfaces: Variant = _current_item_def.get("support_surfaces", [])
+	if raw_support_surfaces is Array and not (raw_support_surfaces as Array).is_empty():
+		var first_surface: Variant = (raw_support_surfaces as Array)[0]
+		if typeof(first_surface) == TYPE_DICTIONARY:
+			return (first_surface as Dictionary).duplicate(true)
+
+	return {}
+
+func _build_support_surfaces_from_controls() -> Array[Dictionary]:
+	if not _can_host_surface_button.button_pressed:
+		return []
+
+	var center_offset := _read_spin_box_vector3(_support_surface_offset_spin_boxes, -TUNING_OFFSET_MAX)
+	var size := _read_spin_box_vector2(_support_surface_size_spin_boxes, 0.0)
+	var half_extents := Vector2(
+		maxf(size.x * 0.5, 0.08),
+		maxf(size.y * 0.5, 0.08)
+	)
+	return [
+		{
+			"id": "top",
+			"center_offset": center_offset,
+			"half_extents": half_extents,
+		}
+	]
+
+func _build_default_support_surface_from_controls() -> Dictionary:
+	if _current_item != null:
+		return _current_item.build_top_support_surface()
+
+	var collision_size := _read_spin_box_vector3(_collision_size_spin_boxes, TUNING_SCALE_MIN)
+	var collision_center := _read_spin_box_vector3(_collision_offset_spin_boxes, -TUNING_OFFSET_MAX)
+	var footprint_half_extents := _read_spin_box_vector2(_footprint_spin_boxes, 0.0) * 0.5
+	var padded_half_extents := footprint_half_extents - Vector2.ONE * 0.06
+	return {
+		"id": "top",
+		"center_offset": Vector3(0.0, collision_center.y + collision_size.y * 0.5, 0.0),
+		"half_extents": Vector2(maxf(padded_half_extents.x, 0.08), maxf(padded_half_extents.y, 0.08)),
+	}
 
 func _select_option_button_metadata(option_button: OptionButton, metadata_value: String) -> void:
 	if option_button == null:
@@ -1584,6 +1690,7 @@ func _get_selected_mount_kind() -> String:
 func _build_selected_override() -> Dictionary:
 	var mount_kind = _get_selected_mount_kind()
 	var requires_wall_opening = _requires_wall_opening_button.button_pressed and mount_kind == RoomConstants.MOUNT_WALL
+	var support_surfaces := _build_support_surfaces_from_controls()
 	return {
 		"visual_scale": _read_spin_box_vector3(_visual_scale_spin_boxes, TUNING_SCALE_MIN),
 		"visual_y_offset": _visual_lift_spin_box.value,
@@ -1595,6 +1702,7 @@ func _build_selected_override() -> Dictionary:
 		"wall_half_extents": _read_spin_box_vector2(_wall_bounds_spin_boxes, 0.0) * 0.5,
 		"wall_opening_half_extents": _read_spin_box_vector2(_wall_opening_spin_boxes, 0.0) * 0.5,
 		"can_host_surface_items": _can_host_surface_button.button_pressed,
+		"support_surfaces": support_surfaces,
 		"requires_wall_opening": requires_wall_opening,
 	}
 
@@ -1607,6 +1715,7 @@ func _build_preview_item_def(base_item_def: Dictionary) -> Dictionary:
 	preview_item_def["mount_kind"] = mount_kind
 	preview_item_def["mount_kinds"] = [mount_kind]
 	preview_item_def["placement_surface_kind"] = RoomConstants.SURFACE_DECOR if mount_kind == RoomConstants.MOUNT_WALL else RoomConstants.FLOOR_SURFACE
+	preview_item_def["support_surfaces"] = override_values.get("support_surfaces", [])
 	if mount_kind == RoomConstants.MOUNT_WALL:
 		preview_item_def["supported_wall_surfaces"] = RoomConstants.WALL_SURFACES
 	return preview_item_def
@@ -1619,7 +1728,7 @@ func _apply_live_preview() -> void:
 		return
 	_current_item_def = _build_preview_item_def(saved_item_def)
 	_has_unsaved_changes = true
-	_rebuild_current_item(_current_item_def, false)
+	_rebuild_current_item(_current_item_def, false, _gizmo_drag_active)
 
 func _discard_unsaved_changes() -> void:
 	if not _has_unsaved_changes:
@@ -1727,6 +1836,16 @@ func _on_numeric_property_changed(_value: Variant = null) -> void:
 	_apply_live_preview()
 
 func _on_boolean_property_changed(_enabled: bool) -> void:
+	if _syncing_controls:
+		return
+	if _can_host_surface_button != null and _can_host_surface_button.button_pressed:
+		var support_size := _read_spin_box_vector2(_support_surface_size_spin_boxes, 0.0)
+		if support_size.length_squared() <= 0.0001:
+			_syncing_controls = true
+			var fallback_support_surface := _build_default_support_surface_from_controls()
+			_set_vector3_spin_boxes(_support_surface_offset_spin_boxes, fallback_support_surface.get("center_offset", Vector3.ZERO) as Vector3)
+			_set_vector2_spin_boxes(_support_surface_size_spin_boxes, (fallback_support_surface.get("half_extents", Vector2.ZERO) as Vector2) * 2.0)
+			_syncing_controls = false
 	_apply_live_preview()
 
 func _get_viewport_size() -> Vector2:

@@ -13,6 +13,7 @@ const ALLOWED_KEYS := {
 	"wall_half_extents": TYPE_VECTOR2,
 	"wall_opening_half_extents": TYPE_VECTOR2,
 	"can_host_surface_items": TYPE_BOOL,
+	"support_surfaces": TYPE_ARRAY,
 	"requires_wall_opening": TYPE_BOOL,
 }
 
@@ -97,9 +98,33 @@ static func _normalize_value(key_name: String, raw_value: Variant) -> Variant:
 			return raw_value as Vector2
 		TYPE_BOOL:
 			return bool(raw_value)
+		TYPE_ARRAY:
+			if key_name == "support_surfaces":
+				return _normalize_support_surfaces(raw_value)
+			return raw_value
 		TYPE_FLOAT:
 			return float(raw_value)
 		TYPE_STRING:
 			return String(raw_value)
 		_:
 			return raw_value
+
+static func _normalize_support_surfaces(raw_value: Variant) -> Array[Dictionary]:
+	var support_surfaces: Array[Dictionary] = []
+	if raw_value is Array:
+		for raw_surface in raw_value:
+			if typeof(raw_surface) != TYPE_DICTIONARY:
+				continue
+			var surface_dict := raw_surface as Dictionary
+			var center_offset := surface_dict.get("center_offset", Vector3.ZERO) as Vector3
+			var half_extents := surface_dict.get("half_extents", Vector2.ZERO) as Vector2
+			if half_extents.x < 0.0 or half_extents.y < 0.0:
+				continue
+			support_surfaces.append(
+				{
+					"id": String(surface_dict.get("id", "top")),
+					"center_offset": center_offset,
+					"half_extents": half_extents,
+				}
+			)
+	return support_surfaces

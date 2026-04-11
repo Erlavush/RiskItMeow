@@ -23,6 +23,7 @@ const CATEGORY_ORDER := [
 	"Windows",
 	"Doors",
 	"Carpets",
+	"Decor",
 	"Miscellaneous",
 ]
 
@@ -181,6 +182,13 @@ static func _build_live_item_defs(persisted_overrides: Dictionary = {}) -> Array
 				"collision_size": Vector3(3.0, 1.8, 0.94),
 				"footprint_half_extents": Vector2(1.5, 0.5),
 				"can_host_surface_items": true,
+				"support_surfaces": [
+					{
+						"id": "top",
+						"center_offset": Vector3(0.0, 1.0625, -0.31),
+						"half_extents": Vector2(1.38, 0.24),
+					},
+				],
 			},
 			CURATED_INITIAL_OWNED,
 			persisted_overrides
@@ -240,6 +248,45 @@ static func _build_live_item_defs(persisted_overrides: Dictionary = {}) -> Array
 			"res://assets/props/small_shelf/small_shelf.glb",
 			{
 				"can_host_surface_items": true,
+			},
+			CURATED_INITIAL_OWNED,
+			persisted_overrides
+		),
+		_build_curated_imported_item_def(
+			"books_stack",
+			"Books Stack",
+			"Decor",
+			"res://assets/props/surface_decor/books_stack/books_stack.glb",
+			{
+				"mount_kind": RoomConstants.MOUNT_SURFACE,
+				"visual_fit_height": 0.42,
+				"preview_yaw": -PI * 0.18,
+			},
+			CURATED_INITIAL_OWNED,
+			persisted_overrides
+		),
+		_build_curated_imported_item_def(
+			"fern_pot",
+			"Fern Pot",
+			"Decor",
+			"res://assets/props/surface_decor/fern_pot/fern_pot.glb",
+			{
+				"mount_kind": RoomConstants.MOUNT_SURFACE,
+				"visual_fit_height": 0.65,
+				"preview_yaw": PI * 0.1,
+			},
+			CURATED_INITIAL_OWNED,
+			persisted_overrides
+		),
+		_build_curated_imported_item_def(
+			"flower_pot",
+			"Flower Pot",
+			"Decor",
+			"res://assets/props/surface_decor/flower_pot/flower_pot.glb",
+			{
+				"mount_kind": RoomConstants.MOUNT_SURFACE,
+				"visual_fit_height": 0.6,
+				"preview_yaw": PI * 0.1,
 			},
 			CURATED_INITIAL_OWNED,
 			persisted_overrides

@@ -27,6 +27,30 @@ static func snap_ceiling_position(room_shell: RoomShell, target_position: Vector
 	snapped_position.y = room_shell.get_ceiling_y()
 	return snapped_position
 
+static func get_rotated_planar_half_extents(half_extents: Vector2, rotation_y: float) -> Vector2:
+	var cosine := absf(cos(rotation_y))
+	var sine := absf(sin(rotation_y))
+	return Vector2(
+		cosine * half_extents.x + sine * half_extents.y,
+		sine * half_extents.x + cosine * half_extents.y
+	)
+
+static func clamp_planar_position(room_shell: RoomShell, target_position: Vector3, surface_name: String, item_half_extents: Vector2) -> Vector3:
+	if room_shell == null:
+		return target_position
+
+	var room_origin: Vector3 = room_shell.global_position
+	var room_half_extents := room_shell.get_inner_half_extents()
+	var min_x := room_origin.x - room_half_extents.x + item_half_extents.x
+	var max_x := room_origin.x + room_half_extents.x - item_half_extents.x
+	var min_z := room_origin.z - room_half_extents.y + item_half_extents.y
+	var max_z := room_origin.z + room_half_extents.y - item_half_extents.y
+	return Vector3(
+		_clamp_or_center(target_position.x, min_x, max_x),
+		room_shell.get_ceiling_y() if surface_name == RoomConstants.CEILING_SURFACE else room_shell.get_floor_y(),
+		_clamp_or_center(target_position.z, min_z, max_z)
+	)
+
 static func snap_wall_position(room_shell: RoomShell, active_surface_name: String, target_position: Vector3, wall_snap_size: float, preview_item: SimpleWoodChair = null) -> Vector3:
 	if room_shell == null:
 		return target_position
@@ -43,6 +67,26 @@ static func snap_wall_position(room_shell: RoomShell, active_surface_name: Strin
 	var snapped_horizontal := horizontal_bounds.x + (float(horizontal_index) + 0.5) * wall_snap_size
 	var snapped_vertical := vertical_bounds.x + (float(vertical_index) + 0.5) * wall_snap_size
 	return build_wall_mount_position(room_shell, active_surface_name, snapped_horizontal, snapped_vertical, preview_item)
+
+static func clamp_wall_position(room_shell: RoomShell, active_surface_name: String, target_position: Vector3, preview_item: SimpleWoodChair = null) -> Vector3:
+	if room_shell == null or preview_item == null:
+		return target_position
+
+	var wall_half_extents := preview_item.get_wall_half_extents()
+	var horizontal_bounds := room_shell.get_wall_surface_horizontal_bounds(active_surface_name)
+	var vertical_bounds := room_shell.get_wall_placement_vertical_bounds()
+	var horizontal_value := get_wall_surface_horizontal_value(active_surface_name, target_position)
+	var clamped_horizontal := _clamp_or_center(
+		horizontal_value,
+		horizontal_bounds.x + wall_half_extents.x,
+		horizontal_bounds.y - wall_half_extents.x
+	)
+	var clamped_vertical := _clamp_or_center(
+		target_position.y,
+		vertical_bounds.x + wall_half_extents.y,
+		vertical_bounds.y - wall_half_extents.y
+	)
+	return build_wall_mount_position(room_shell, active_surface_name, clamped_horizontal, clamped_vertical, preview_item)
 
 static func get_wall_snap_size(preview_item: SimpleWoodChair, grid_size: float, wall_snap_size: float) -> float:
 	return wall_snap_size if is_wall_placeable(preview_item) else grid_size
@@ -250,3 +294,8 @@ static func is_ceiling_placeable(item: SimpleWoodChair) -> bool:
 
 static func is_support_surface_placeable(item: SimpleWoodChair) -> bool:
 	return get_mount_kind(item) == RoomConstants.MOUNT_SURFACE
+
+static func _clamp_or_center(value: float, min_value: float, max_value: float) -> float:
+	if min_value > max_value:
+		return (min_value + max_value) * 0.5
+	return clampf(value, min_value, max_value)

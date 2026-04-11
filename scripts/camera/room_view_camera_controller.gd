@@ -65,18 +65,23 @@ func handle_input_event(event: InputEvent) -> bool:
 
 	if event is InputEventMouseButton:
 		var mouse_button := event as InputEventMouseButton
+		var hovered_control := get_viewport().gui_get_hovered_control()
 		match mouse_button.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
 				if mouse_button.pressed:
+					if hovered_control != null:
+						return false
 					_apply_zoom_delta(-1.0, absf(mouse_button.factor))
 					return true
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if mouse_button.pressed:
+					if hovered_control != null:
+						return false
 					_apply_zoom_delta(1.0, absf(mouse_button.factor))
 					return true
 			ORBIT_DRAG_BUTTON:
 				if mouse_button.pressed:
-					if get_viewport().gui_get_hovered_control() != null:
+					if hovered_control != null:
 						return false
 					_drag_button = mouse_button.button_index
 					return true

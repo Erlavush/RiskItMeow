@@ -78,7 +78,7 @@ var _wall_half_extents_override := Vector2.ZERO
 var _can_host_surface_items_override := false
 var _support_surfaces_override: Array[Dictionary] = []
 var _has_runtime_shadow_cast_setting_override := false
-var _runtime_shadow_cast_setting_override := GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+var _runtime_shadow_cast_setting_override: GeometryInstance3D.ShadowCastingSetting = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 func configure_from_item_def(item_def: Dictionary) -> void:
 	_item_id = String(item_def.get("id", _item_id))
@@ -113,7 +113,7 @@ func configure_from_item_def(item_def: Dictionary) -> void:
 	_can_host_surface_items_override = bool(item_def.get("can_host_surface_items", false))
 	_support_surfaces_override = _normalize_support_surfaces(item_def.get("support_surfaces", []))
 	_has_runtime_shadow_cast_setting_override = item_def.has("runtime_shadow_cast_setting")
-	_runtime_shadow_cast_setting_override = int(item_def.get("runtime_shadow_cast_setting", GeometryInstance3D.SHADOW_CASTING_SETTING_ON))
+	_runtime_shadow_cast_setting_override = item_def.get("runtime_shadow_cast_setting", GeometryInstance3D.SHADOW_CASTING_SETTING_ON) as GeometryInstance3D.ShadowCastingSetting
 
 func get_prop_id() -> String:
 	return _item_id
@@ -213,7 +213,7 @@ func supports_rotation() -> bool:
 func get_wall_rotation_offset() -> float:
 	return _wall_rotation_offset_override
 
-func get_runtime_shadow_cast_setting() -> int:
+func get_runtime_shadow_cast_setting() -> GeometryInstance3D.ShadowCastingSetting:
 	if _has_runtime_shadow_cast_setting_override:
 		return _runtime_shadow_cast_setting_override
 	return super.get_runtime_shadow_cast_setting()
@@ -391,10 +391,10 @@ func _get_effective_visual_scale() -> Vector3:
 	return _get_base_visual_scale(raw_size)
 
 func _get_base_visual_scale(raw_size: Vector3) -> Vector3:
-	var scale := _visual_scale_override
+	var visual_scale := _visual_scale_override
 	if _visual_fit_height_override > 0.0 and raw_size.y > 0.001:
-		scale *= _visual_fit_height_override / raw_size.y
-	return scale
+		visual_scale *= _visual_fit_height_override / raw_size.y
+	return visual_scale
 
 func _get_auto_fit_metrics() -> Dictionary:
 	if not _should_use_auto_fit_metrics():

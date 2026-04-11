@@ -3,6 +3,7 @@ extends RefCounted
 
 const SAVE_PATH := "user://room_layout.json"
 const VERSION := 3
+const ROTATION_PRECISION := 0.0001
 
 static func serialize_vector3(value: Vector3) -> Dictionary:
 	return {
@@ -65,7 +66,7 @@ static func _serialize_placeable(placeable: SimpleWoodChair, item_id: String, in
 	var entry := {
 		"instance_id": instance_id,
 		"item_id": item_id,
-		"rotation_y": snappedf(placeable.rotation.y, 0.001),
+		"rotation_y": snappedf(placeable.rotation.y, ROTATION_PRECISION),
 	}
 
 	var host_placeable := placeable.get_parent() as SimpleWoodChair

@@ -5,7 +5,7 @@ extends CanvasLayer
 signal environment_state_changed
 
 const PANEL_WIDTH := 344.0
-const PANEL_HEIGHT := 620.0
+const PANEL_HEIGHT := 760.0
 const EDGE_MARGIN := 16.0
 const BUTTON_WIDTH := 168.0
 const BUTTON_HEIGHT := 36.0
@@ -16,15 +16,20 @@ const SUN_PRESET_MORNING := DeveloperEnvironmentPresets.SUN_PRESET_MORNING
 const SUN_PRESET_NOON := DeveloperEnvironmentPresets.SUN_PRESET_NOON
 const SUN_PRESET_SUNSET := DeveloperEnvironmentPresets.SUN_PRESET_SUNSET
 const SUN_PRESET_AFTERNOON_COZY := DeveloperEnvironmentPresets.SUN_PRESET_AFTERNOON_COZY
+const WorldTimeControllerScript := preload("res://scripts/world/world_time_controller.gd")
 
 @export var world_environment_path: NodePath
 @export var directional_light_path: NodePath
 @export var debug_world_controller_path: NodePath
+@export var world_time_controller_path: NodePath
+@export var world_time_atmosphere_controller_path: NodePath
 
 var _world_environment: WorldEnvironment
 var _directional_light: DirectionalLight3D
 var _environment: Environment
 var _debug_world_controller: DebugWorldController
+var _world_time_controller: Node
+var _world_time_atmosphere_controller: Node
 
 var _default_values: Dictionary = {}
 var _base_ambient_color := Color.WHITE
@@ -44,6 +49,12 @@ var _toggle_bindings: Array[Dictionary] = []
 var _editor_preview_poll_time := 0.0
 var _editor_persistent_signature := ""
 var _syncing_debug_world_button := false
+var _sun_preset_buttons: Array[Button] = []
+var _manual_atmosphere_sliders: Array[HSlider] = []
+var _manual_atmosphere_buttons: Array[BaseButton] = []
+var _time_of_day_slider: HSlider
+var _time_of_day_value_label: Label
+var _time_of_day_readout_label: Label
 
 func _ready() -> void:
 	layer = 20
@@ -51,9 +62,12 @@ func _ready() -> void:
 	_directional_light = get_node_or_null(directional_light_path) as DirectionalLight3D
 	_environment = _world_environment.environment if _world_environment != null else null
 	_debug_world_controller = get_node_or_null(debug_world_controller_path) as DebugWorldController
+	_world_time_controller = _resolve_world_time_controller()
+	_world_time_atmosphere_controller = get_node_or_null(world_time_atmosphere_controller_path)
 	var debug_world_callback := Callable(self, "_on_debug_world_enabled_changed")
 	if _debug_world_controller != null and not _debug_world_controller.is_connected("debug_world_enabled_changed", debug_world_callback):
 		_debug_world_controller.connect("debug_world_enabled_changed", debug_world_callback)
+	_connect_world_time_signals()
 
 	_capture_defaults()
 	if Engine.is_editor_hint():
@@ -83,6 +97,13 @@ func _capture_defaults() -> void:
 	_base_ambient_color = captured.get("base_ambient_color", Color.WHITE) as Color
 	_base_fog_color = captured.get("base_fog_color", Color.WHITE) as Color
 	_base_light_color = captured.get("base_light_color", Color.WHITE) as Color
+	if _can_call_world_time_controller("get_day_time"):
+		_default_values["world_time_day_time"] = int(_call_world_time_controller("get_day_time", 6000))
+		_default_values["world_time_daylight_cycle_enabled"] = bool(_call_world_time_controller("is_daylight_cycle_enabled", true))
+		_default_values["world_time_scale"] = float(_call_world_time_controller("get_time_scale", 1.0))
+	if _can_call_world_time_atmosphere_controller("is_atmosphere_enabled"):
+		_default_values["world_time_atmosphere_enabled"] = bool(_call_world_time_atmosphere_controller("is_atmosphere_enabled", true))
+		_default_values["world_time_atmosphere_strength"] = float(_call_world_time_atmosphere_controller("get_atmosphere_strength", 1.0))
 
 func _build_ui() -> void:
 	_ui_root = Control.new()
@@ -188,38 +209,71 @@ func _build_ui() -> void:
 	controls.add_theme_constant_override("separation", 10)
 	scroll.add_child(controls)
 
+	_add_section_label(controls, "World Time")
+	_add_toggle_control(controls, "Daylight Cycle", Callable(self, "_get_world_time_cycle_enabled"), Callable(self, "_set_world_time_cycle_enabled"))
+	_add_toggle_control(controls, "Time Atmosphere", Callable(self, "_get_world_time_atmosphere_enabled"), Callable(self, "_set_world_time_atmosphere_enabled"))
+	_add_slider_control(controls, "Atmosphere Strength", 0.0, 1.0, 0.01, Callable(self, "_get_world_time_atmosphere_strength"), Callable(self, "_set_world_time_atmosphere_strength"))
+	var time_of_day_binding := _add_slider_control(controls, "Time of Day", 0.0, float(WorldTimeControllerScript.TICKS_PER_DAY - 1), 1.0, Callable(self, "_get_world_time_day_time"), Callable(self, "_set_world_time_day_time"))
+	_time_of_day_slider = time_of_day_binding.get("slider", null) as HSlider
+	_time_of_day_value_label = time_of_day_binding.get("value_label", null) as Label
+	_add_slider_control(controls, "Time Speed", 0.1, 64.0, 0.1, Callable(self, "_get_world_time_scale"), Callable(self, "_set_world_time_scale"))
+	_time_of_day_readout_label = Label.new()
+	_time_of_day_readout_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_time_of_day_readout_label.add_theme_font_size_override("font_size", 11)
+	_time_of_day_readout_label.add_theme_color_override("font_color", PlacementUiStyles.COLOR_TEXT_MUTED)
+	controls.add_child(_time_of_day_readout_label)
+
 	_add_section_label(controls, "Light")
 	_add_sun_preset_controls(controls)
-	_add_slider_control(controls, "Sun Energy", 0.0, 3.0, 0.01, Callable(self, "_get_light_energy"), Callable(self, "_set_light_energy"))
-	_add_slider_control(controls, "Warmth", -1.0, 1.0, 0.01, Callable(self, "_get_warmth"), Callable(self, "_set_warmth"))
+	var light_energy_binding := _add_slider_control(controls, "Sun Energy", 0.0, 3.0, 0.01, Callable(self, "_get_light_energy"), Callable(self, "_set_light_energy"))
+	var warmth_binding := _add_slider_control(controls, "Warmth", -1.0, 1.0, 0.01, Callable(self, "_get_warmth"), Callable(self, "_set_warmth"))
 	_add_toggle_control(controls, "Shadows", Callable(self, "_get_shadow_enabled"), Callable(self, "_set_shadow_enabled"))
 	_add_slider_control(controls, "Shadow Opacity", 0.0, 1.0, 0.01, Callable(self, "_get_shadow_opacity"), Callable(self, "_set_shadow_opacity"))
 	_add_slider_control(controls, "Shadow Blur", 0.0, 4.0, 0.05, Callable(self, "_get_shadow_blur"), Callable(self, "_set_shadow_blur"))
 	_add_slider_control(controls, "Shadow Distance", 5.0, 100.0, 1.0, Callable(self, "_get_shadow_distance"), Callable(self, "_set_shadow_distance"))
 
 	_add_section_label(controls, "Ambient and Post")
-	_add_slider_control(controls, "Ambient Energy", 0.0, 2.0, 0.01, Callable(self, "_get_ambient_energy"), Callable(self, "_set_ambient_energy"))
-	_add_slider_control(controls, "Ambient Sky Mix", 0.0, 1.0, 0.01, Callable(self, "_get_ambient_sky_mix"), Callable(self, "_set_ambient_sky_mix"))
-	_add_slider_control(controls, "Exposure", 0.2, 2.5, 0.01, Callable(self, "_get_exposure"), Callable(self, "_set_exposure"))
-	_add_toggle_control(controls, "Post Adjust", Callable(self, "_get_post_adjust_enabled"), Callable(self, "_set_post_adjust_enabled"))
-	_add_slider_control(controls, "Brightness", 0.5, 1.5, 0.01, Callable(self, "_get_brightness"), Callable(self, "_set_brightness"))
-	_add_slider_control(controls, "Contrast", 0.5, 1.7, 0.01, Callable(self, "_get_contrast"), Callable(self, "_set_contrast"))
-	_add_slider_control(controls, "Saturation", 0.0, 2.0, 0.01, Callable(self, "_get_saturation"), Callable(self, "_set_saturation"))
+	var ambient_energy_binding := _add_slider_control(controls, "Ambient Energy", 0.0, 2.0, 0.01, Callable(self, "_get_ambient_energy"), Callable(self, "_set_ambient_energy"))
+	var ambient_mix_binding := _add_slider_control(controls, "Ambient Sky Mix", 0.0, 1.0, 0.01, Callable(self, "_get_ambient_sky_mix"), Callable(self, "_set_ambient_sky_mix"))
+	var exposure_binding := _add_slider_control(controls, "Exposure", 0.2, 2.5, 0.01, Callable(self, "_get_exposure"), Callable(self, "_set_exposure"))
+	var post_adjust_toggle := _add_toggle_control(controls, "Post Adjust", Callable(self, "_get_post_adjust_enabled"), Callable(self, "_set_post_adjust_enabled"))
+	var brightness_binding := _add_slider_control(controls, "Brightness", 0.5, 1.5, 0.01, Callable(self, "_get_brightness"), Callable(self, "_set_brightness"))
+	var contrast_binding := _add_slider_control(controls, "Contrast", 0.5, 1.7, 0.01, Callable(self, "_get_contrast"), Callable(self, "_set_contrast"))
+	var saturation_binding := _add_slider_control(controls, "Saturation", 0.0, 2.0, 0.01, Callable(self, "_get_saturation"), Callable(self, "_set_saturation"))
 
 	_add_section_label(controls, "Fog and Glow")
-	_add_toggle_control(controls, "Fog", Callable(self, "_get_fog_enabled"), Callable(self, "_set_fog_enabled"))
-	_add_slider_control(controls, "Fog Density", 0.0, 0.5, 0.005, Callable(self, "_get_fog_density"), Callable(self, "_set_fog_density"))
-	_add_slider_control(controls, "Fog Depth End", 5.0, 120.0, 1.0, Callable(self, "_get_fog_depth_end"), Callable(self, "_set_fog_depth_end"))
-	_add_slider_control(controls, "Fog Energy", 0.0, 2.0, 0.01, Callable(self, "_get_fog_energy"), Callable(self, "_set_fog_energy"))
-	_add_toggle_control(controls, "Glow", Callable(self, "_get_glow_enabled"), Callable(self, "_set_glow_enabled"))
-	_add_slider_control(controls, "Glow Bloom", 0.0, 1.0, 0.01, Callable(self, "_get_glow_bloom"), Callable(self, "_set_glow_bloom"))
-	_add_slider_control(controls, "Glow HDR", 0.0, 3.0, 0.01, Callable(self, "_get_glow_hdr"), Callable(self, "_set_glow_hdr"))
+	var fog_toggle := _add_toggle_control(controls, "Fog", Callable(self, "_get_fog_enabled"), Callable(self, "_set_fog_enabled"))
+	var fog_density_binding := _add_slider_control(controls, "Fog Density", 0.0, 0.5, 0.005, Callable(self, "_get_fog_density"), Callable(self, "_set_fog_density"))
+	var fog_depth_binding := _add_slider_control(controls, "Fog Depth End", 5.0, 120.0, 1.0, Callable(self, "_get_fog_depth_end"), Callable(self, "_set_fog_depth_end"))
+	var fog_energy_binding := _add_slider_control(controls, "Fog Energy", 0.0, 2.0, 0.01, Callable(self, "_get_fog_energy"), Callable(self, "_set_fog_energy"))
+	var glow_toggle := _add_toggle_control(controls, "Glow", Callable(self, "_get_glow_enabled"), Callable(self, "_set_glow_enabled"))
+	var glow_bloom_binding := _add_slider_control(controls, "Glow Bloom", 0.0, 1.0, 0.01, Callable(self, "_get_glow_bloom"), Callable(self, "_set_glow_bloom"))
+	var glow_hdr_binding := _add_slider_control(controls, "Glow HDR", 0.0, 3.0, 0.01, Callable(self, "_get_glow_hdr"), Callable(self, "_set_glow_hdr"))
+
+	_register_manual_atmosphere_slider(light_energy_binding)
+	_register_manual_atmosphere_slider(warmth_binding)
+	_register_manual_atmosphere_slider(ambient_energy_binding)
+	_register_manual_atmosphere_slider(ambient_mix_binding)
+	_register_manual_atmosphere_slider(exposure_binding)
+	_register_manual_atmosphere_button(post_adjust_toggle)
+	_register_manual_atmosphere_slider(brightness_binding)
+	_register_manual_atmosphere_slider(contrast_binding)
+	_register_manual_atmosphere_slider(saturation_binding)
+	_register_manual_atmosphere_button(fog_toggle)
+	_register_manual_atmosphere_slider(fog_density_binding)
+	_register_manual_atmosphere_slider(fog_depth_binding)
+	_register_manual_atmosphere_slider(fog_energy_binding)
+	_register_manual_atmosphere_button(glow_toggle)
+	_register_manual_atmosphere_slider(glow_bloom_binding)
+	_register_manual_atmosphere_slider(glow_hdr_binding)
 
 	_save_timer = Timer.new()
 	_save_timer.one_shot = true
 	_save_timer.wait_time = PERSISTENT_SAVE_DELAY_SECONDS
 	_save_timer.timeout.connect(_save_persistent_state)
 	add_child(_save_timer)
+	_refresh_world_time_ui()
+	_refresh_atmosphere_control_states()
 
 func _add_section_label(parent: VBoxContainer, text_value: String) -> void:
 	var separator := HSeparator.new()
@@ -231,6 +285,7 @@ func _add_section_label(parent: VBoxContainer, text_value: String) -> void:
 	parent.add_child(label)
 
 func _add_sun_preset_controls(parent: VBoxContainer) -> void:
+	_sun_preset_buttons.clear()
 	var label := Label.new()
 	label.text = "Sun Presets"
 	label.add_theme_font_size_override("font_size", 12)
@@ -248,11 +303,13 @@ func _add_sun_preset_controls(parent: VBoxContainer) -> void:
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_on_sun_preset_pressed.bind(preset_name))
 		grid.add_child(button)
+		_sun_preset_buttons.append(button)
+		_register_manual_atmosphere_button(button)
 
 func _get_sun_preset_label(preset_name: String) -> String:
 	return DeveloperEnvironmentPresets.get_label(preset_name)
 
-func _add_slider_control(parent: VBoxContainer, title_text: String, min_value: float, max_value: float, step_value: float, getter: Callable, setter: Callable) -> void:
+func _add_slider_control(parent: VBoxContainer, title_text: String, min_value: float, max_value: float, step_value: float, getter: Callable, setter: Callable) -> Dictionary:
 	var wrapper := VBoxContainer.new()
 	wrapper.add_theme_constant_override("separation", 4)
 	parent.add_child(wrapper)
@@ -284,8 +341,13 @@ func _add_slider_control(parent: VBoxContainer, title_text: String, min_value: f
 		"getter": getter,
 		"step": step_value,
 	})
+	return {
+		"wrapper": wrapper,
+		"slider": slider,
+		"value_label": value_label,
+	}
 
-func _add_toggle_control(parent: VBoxContainer, title_text: String, getter: Callable, setter: Callable) -> void:
+func _add_toggle_control(parent: VBoxContainer, title_text: String, getter: Callable, setter: Callable) -> CheckButton:
 	var toggle := CheckButton.new()
 	toggle.text = title_text
 	toggle.toggled.connect(_on_toggle_value_changed.bind(setter))
@@ -295,6 +357,7 @@ func _add_toggle_control(parent: VBoxContainer, title_text: String, getter: Call
 		"toggle": toggle,
 		"getter": getter,
 	})
+	return toggle
 
 func toggle_panel_open() -> void:
 	if _toggle_button == null or _panel == null or not _toggle_button.visible:
@@ -415,6 +478,8 @@ func _sync_controls_from_state() -> void:
 		toggle.button_pressed = bool(getter.call())
 
 	_syncing_controls = false
+	_refresh_world_time_ui()
+	_refresh_atmosphere_control_states()
 
 func _format_number(value: float, step_value: float) -> String:
 	if step_value >= 1.0:
@@ -424,6 +489,127 @@ func _format_number(value: float, step_value: float) -> String:
 	if step_value >= 0.01:
 		return "%.2f" % value
 	return "%.3f" % value
+
+func _register_manual_atmosphere_slider(binding: Dictionary) -> void:
+	var slider := binding.get("slider", null) as HSlider
+	if slider != null:
+		_manual_atmosphere_sliders.append(slider)
+
+func _register_manual_atmosphere_button(button: BaseButton) -> void:
+	if button != null:
+		_manual_atmosphere_buttons.append(button)
+
+func _refresh_atmosphere_control_states() -> void:
+	var manual_controls_enabled := not _get_world_time_atmosphere_enabled()
+	for button in _manual_atmosphere_buttons:
+		if button != null:
+			button.disabled = not manual_controls_enabled
+	for slider in _manual_atmosphere_sliders:
+		if slider != null:
+			slider.editable = manual_controls_enabled
+
+func _connect_world_time_signals() -> void:
+	if _world_time_controller == null or not _world_time_controller.has_signal("time_changed"):
+		return
+	var time_callback := Callable(self, "_on_world_time_changed")
+	if not _world_time_controller.is_connected("time_changed", time_callback):
+		_world_time_controller.connect("time_changed", time_callback)
+
+func _can_call_world_time_controller(method_name: StringName) -> bool:
+	if Engine.is_editor_hint():
+		return false
+	return _world_time_controller != null and _world_time_controller.has_method(method_name)
+
+func _call_world_time_controller(method_name: StringName, default_value: Variant = null, arguments: Array = []) -> Variant:
+	if not _can_call_world_time_controller(method_name):
+		return default_value
+	return _world_time_controller.callv(method_name, arguments)
+
+func _can_call_world_time_atmosphere_controller(method_name: StringName) -> bool:
+	if Engine.is_editor_hint():
+		return false
+	return _world_time_atmosphere_controller != null and _world_time_atmosphere_controller.has_method(method_name)
+
+func _call_world_time_atmosphere_controller(method_name: StringName, default_value: Variant = null, arguments: Array = []) -> Variant:
+	if not _can_call_world_time_atmosphere_controller(method_name):
+		return default_value
+	return _world_time_atmosphere_controller.callv(method_name, arguments)
+
+func _resolve_world_time_controller() -> Node:
+	var controller := get_node_or_null(world_time_controller_path)
+	if controller != null:
+		return controller
+	if get_tree() == null:
+		return null
+	for node in get_tree().get_nodes_in_group(WorldTimeControllerScript.GROUP_NAME):
+		if node != null:
+			return node
+	return null
+
+func _refresh_world_time_ui() -> void:
+	if _time_of_day_slider == null:
+		return
+	var day_time := int(_call_world_time_controller("get_day_time", 0))
+	var previous_sync := _syncing_controls
+	_syncing_controls = true
+	_time_of_day_slider.value = day_time
+	if _time_of_day_value_label != null:
+		_time_of_day_value_label.text = _format_number(day_time, 1.0)
+	_syncing_controls = previous_sync
+	if _time_of_day_readout_label != null:
+		var cycle_state := "Running" if _get_world_time_cycle_enabled() else "Paused"
+		_time_of_day_readout_label.text = "Current world time: %s  |  Tick %d  |  %s" % [WorldTimeControllerScript.format_clock_time(day_time), day_time, cycle_state]
+
+func _on_world_time_changed(_game_time: int, _day_time: int, _partial_tick: float) -> void:
+	_refresh_world_time_ui()
+
+func _get_world_time_day_time() -> float:
+	return float(_call_world_time_controller("get_day_time", 0))
+
+func _set_world_time_day_time(value: float) -> void:
+	if not _can_call_world_time_controller("set_day_time"):
+		return
+	_call_world_time_controller("set_day_time", null, [int(round(value))])
+	_refresh_world_time_ui()
+	_queue_persistent_save()
+
+func _get_world_time_cycle_enabled() -> bool:
+	return bool(_call_world_time_controller("is_daylight_cycle_enabled", false))
+
+func _set_world_time_cycle_enabled(value: bool) -> void:
+	if not _can_call_world_time_controller("set_daylight_cycle_enabled"):
+		return
+	_call_world_time_controller("set_daylight_cycle_enabled", null, [value])
+	_refresh_world_time_ui()
+	_queue_persistent_save()
+
+func _get_world_time_scale() -> float:
+	return float(_call_world_time_controller("get_time_scale", 1.0))
+
+func _set_world_time_scale(value: float) -> void:
+	if not _can_call_world_time_controller("set_time_scale"):
+		return
+	_call_world_time_controller("set_time_scale", null, [value])
+	_queue_persistent_save()
+
+func _get_world_time_atmosphere_enabled() -> bool:
+	return bool(_call_world_time_atmosphere_controller("is_atmosphere_enabled", false))
+
+func _set_world_time_atmosphere_enabled(value: bool) -> void:
+	if not _can_call_world_time_atmosphere_controller("set_atmosphere_enabled"):
+		return
+	_call_world_time_atmosphere_controller("set_atmosphere_enabled", null, [value])
+	_refresh_atmosphere_control_states()
+	_queue_persistent_save()
+
+func _get_world_time_atmosphere_strength() -> float:
+	return float(_call_world_time_atmosphere_controller("get_atmosphere_strength", 1.0))
+
+func _set_world_time_atmosphere_strength(value: float) -> void:
+	if not _can_call_world_time_atmosphere_controller("set_atmosphere_strength"):
+		return
+	_call_world_time_atmosphere_controller("set_atmosphere_strength", null, [value])
+	_queue_persistent_save()
 
 func _get_light_energy() -> float:
 	return _directional_light.light_energy if _directional_light != null else 0.0
@@ -608,9 +794,29 @@ func _apply_sun_preset(preset_name: String) -> void:
 		return
 
 	_apply_state_values(values)
+	if not _can_call_world_time_controller("set_day_time"):
+		return
+	match preset_name:
+		SUN_PRESET_MORNING:
+			_call_world_time_controller("set_day_time", null, [1500])
+		SUN_PRESET_NOON:
+			_call_world_time_controller("set_day_time", null, [6000])
+		SUN_PRESET_SUNSET:
+			_call_world_time_controller("set_day_time", null, [12000])
+		SUN_PRESET_AFTERNOON_COZY:
+			_call_world_time_controller("set_day_time", null, [9000])
+	_refresh_world_time_ui()
 
 func _capture_current_values() -> Dictionary:
-	return DeveloperEnvironmentState.capture_current_values(_environment, _directional_light, _warmth)
+	var values := DeveloperEnvironmentState.capture_current_values(_environment, _directional_light, _warmth)
+	if _can_call_world_time_controller("get_day_time"):
+		values["world_time_day_time"] = int(_call_world_time_controller("get_day_time", 6000))
+		values["world_time_daylight_cycle_enabled"] = bool(_call_world_time_controller("is_daylight_cycle_enabled", true))
+		values["world_time_scale"] = float(_call_world_time_controller("get_time_scale", 1.0))
+	if _can_call_world_time_atmosphere_controller("is_atmosphere_enabled"):
+		values["world_time_atmosphere_enabled"] = bool(_call_world_time_atmosphere_controller("is_atmosphere_enabled", true))
+		values["world_time_atmosphere_strength"] = float(_call_world_time_atmosphere_controller("get_atmosphere_strength", 1.0))
+	return values
 
 func _apply_state_values(values: Dictionary) -> void:
 	_warmth = DeveloperEnvironmentState.apply_state_values(
@@ -622,9 +828,21 @@ func _apply_state_values(values: Dictionary) -> void:
 		_base_light_color,
 		values
 	)
+	if _can_call_world_time_controller("set_daylight_cycle_enabled"):
+		_call_world_time_controller("set_daylight_cycle_enabled", null, [bool(values.get("world_time_daylight_cycle_enabled", _default_values.get("world_time_daylight_cycle_enabled", true)))])
+		_call_world_time_controller("set_time_scale", null, [float(values.get("world_time_scale", _default_values.get("world_time_scale", 1.0)))])
+		_call_world_time_controller("set_day_time", null, [int(values.get("world_time_day_time", _default_values.get("world_time_day_time", 6000)))])
+	if _can_call_world_time_atmosphere_controller("capture_current_as_base"):
+		_call_world_time_atmosphere_controller("capture_current_as_base")
+		_call_world_time_atmosphere_controller("set_atmosphere_strength", null, [float(values.get("world_time_atmosphere_strength", _default_values.get("world_time_atmosphere_strength", 1.0)))])
+		_call_world_time_atmosphere_controller("set_atmosphere_enabled", null, [bool(values.get("world_time_atmosphere_enabled", _default_values.get("world_time_atmosphere_enabled", true)))])
+	_refresh_world_time_ui()
+	_refresh_atmosphere_control_states()
 	environment_state_changed.emit()
 
 func _queue_persistent_save() -> void:
+	if _can_call_world_time_atmosphere_controller("is_atmosphere_enabled") and not bool(_call_world_time_atmosphere_controller("is_atmosphere_enabled", false)):
+		_call_world_time_atmosphere_controller("capture_current_as_base")
 	if _save_timer == null:
 		return
 	_save_timer.start()

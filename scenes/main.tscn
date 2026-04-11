@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://cscsalyju8rbb" path="res://scripts/debug/debug_world_controller.gd" id="8_debug_world"]
 [ext_resource type="Script" uid="uid://biphuuxbmh6fh" path="res://scripts/world/world_time_controller.gd" id="9_world_time"]
 [ext_resource type="Script" uid="uid://d2m4xq06hoko3" path="res://scripts/world/world_time_sun_controller.gd" id="10_world_time_sun"]
+[ext_resource type="Script" path="res://scripts/world/world_time_atmosphere_controller.gd" id="11_world_time_atmosphere"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_main"]
 sky_top_color = Color(0.54, 0.64, 0.76, 1)
@@ -75,6 +76,12 @@ script = ExtResource("10_world_time_sun")
 world_time_controller_path = NodePath("../WorldTimeController")
 directional_light_path = NodePath("../DirectionalLight3D")
 
+[node name="WorldTimeAtmosphereController" type="Node" parent="." unique_id=321873410]
+script = ExtResource("11_world_time_atmosphere")
+world_time_controller_path = NodePath("../WorldTimeController")
+world_environment_path = NodePath("../WorldEnvironment")
+directional_light_path = NodePath("../DirectionalLight3D")
+
 [node name="RoomShell" parent="." unique_id=877916492 instance=ExtResource("2_room_shell")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.031985283, -0.0033729076, -0.017820835)
 room_half_extents = Vector2(4, 4)
@@ -124,6 +131,8 @@ script = ExtResource("4_developer_panel")
 world_environment_path = NodePath("../WorldEnvironment")
 directional_light_path = NodePath("../DirectionalLight3D")
 debug_world_controller_path = NodePath("../DebugWorldController")
+world_time_controller_path = NodePath("../WorldTimeController")
+world_time_atmosphere_controller_path = NodePath("../WorldTimeAtmosphereController")
 
 [node name="Player" parent="." unique_id=1826654061 instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.85)

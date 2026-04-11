@@ -1,3 +1,4 @@
+@tool
 class_name WoodenBlockClockPlaceable
 extends SimpleWoodChair
 
@@ -28,6 +29,7 @@ var _wall_half_extents_override := Vector2.ZERO
 var _requires_wall_opening_override := false
 var _wall_opening_half_extents_override := Vector2.ZERO
 var _can_host_surface_items_override := false
+var _support_surfaces_override: Array[Dictionary] = []
 var _visual_scale_override := Vector3.	ONE
 var _visual_y_offset_override := 0.0
 var _visual_yaw_override := 0.0
@@ -70,6 +72,7 @@ func configure_from_item_def(item_def: Dictionary) -> void:
 	_requires_wall_opening_override = bool(item_def.get("requires_wall_opening", false))
 	_wall_opening_half_extents_override = item_def.get("wall_opening_half_extents", Vector2.ZERO) as Vector2
 	_can_host_surface_items_override = bool(item_def.get("can_host_surface_items", false))
+	_support_surfaces_override = _normalize_support_surfaces(item_def.get("support_surfaces", []))
 	_visual_scale_override = item_def.get("visual_scale", Vector3.ONE) as Vector3
 	_visual_y_offset_override = float(item_def.get("visual_y_offset", 0.0))
 	_visual_yaw_override = float(item_def.get("visual_yaw", 0.0))
@@ -116,12 +119,34 @@ func get_wall_opening_half_extents() -> Vector2:
 	return super.get_wall_opening_half_extents()
 
 func can_host_surface_items() -> bool:
-	return _can_host_surface_items_override
+	return _can_host_surface_items_override or not _support_surfaces_override.is_empty()
 
 func get_support_surfaces() -> Array[Dictionary]:
+	if not _support_surfaces_override.is_empty():
+		return _support_surfaces_override.duplicate(true)
 	if _can_host_surface_items_override:
 		return [build_top_support_surface()]
 	return []
+
+func _normalize_support_surfaces(raw_surfaces: Variant) -> Array[Dictionary]:
+	var support_surfaces: Array[Dictionary] = []
+	if raw_surfaces is Array:
+		for raw_surface in raw_surfaces:
+			if typeof(raw_surface) != TYPE_DICTIONARY:
+				continue
+			var surface_dict := raw_surface as Dictionary
+			var center_offset := surface_dict.get("center_offset", Vector3.ZERO) as Vector3
+			var half_extents := surface_dict.get("half_extents", Vector2.ZERO) as Vector2
+			if half_extents.x <= 0.001 or half_extents.y <= 0.001:
+				continue
+			support_surfaces.append(
+				{
+					"id": String(surface_dict.get("id", "top")),
+					"center_offset": center_offset,
+					"half_extents": half_extents,
+				}
+			)
+	return support_surfaces
 
 func _ensure_visual() -> void:
 	_visual_root = get_node_or_null("VisualRoot") as Node3D

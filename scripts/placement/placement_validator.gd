@@ -7,7 +7,8 @@ static func evaluate_preview_transform(
 	preview_item: SimpleWoodChair,
 	active_surface_name: String,
 	placement_query_shape: Shape3D,
-	excluded_rids: Array[RID] = []
+	excluded_rids: Array[RID] = [],
+	use_rotated_planar_bounds: bool = false
 ) -> Dictionary:
 	if preview_item == null or room_shell == null or world_3d == null:
 		return {"valid": false, "code": "missing", "reason": "Placement unavailable"}
@@ -15,11 +16,13 @@ static func evaluate_preview_transform(
 	if PlacementSurfaceQueries.is_wall_placeable(preview_item):
 		return _evaluate_wall_preview_transform(world_3d, room_shell, preview_item, active_surface_name, placement_query_shape, excluded_rids)
 	if PlacementSurfaceQueries.is_ceiling_placeable(preview_item):
-		return _evaluate_ceiling_preview_transform(world_3d, room_shell, preview_item, active_surface_name, placement_query_shape, excluded_rids)
+		return _evaluate_ceiling_preview_transform(world_3d, room_shell, preview_item, active_surface_name, placement_query_shape, excluded_rids, use_rotated_planar_bounds)
 
 	var room_origin: Vector3 = room_shell.global_position
 	var room_half_extents := room_shell.get_inner_half_extents()
 	var footprint := preview_item.get_footprint_half_extents()
+	if use_rotated_planar_bounds:
+		footprint = PlacementSurfaceQueries.get_rotated_planar_half_extents(footprint, preview_item.rotation.y)
 	var local_x: float = preview_item.global_position.x - room_origin.x
 	var local_z: float = preview_item.global_position.z - room_origin.z
 
@@ -48,7 +51,8 @@ static func _evaluate_ceiling_preview_transform(
 	preview_item: SimpleWoodChair,
 	active_surface_name: String,
 	placement_query_shape: Shape3D,
-	excluded_rids: Array[RID] = []
+	excluded_rids: Array[RID] = [],
+	use_rotated_planar_bounds: bool = false
 ) -> Dictionary:
 	if active_surface_name != RoomConstants.CEILING_SURFACE:
 		return {"valid": false, "code": "surface", "reason": "Select the ceiling"}
@@ -58,6 +62,8 @@ static func _evaluate_ceiling_preview_transform(
 	var room_origin: Vector3 = room_shell.global_position
 	var room_half_extents := room_shell.get_inner_half_extents()
 	var footprint := preview_item.get_footprint_half_extents()
+	if use_rotated_planar_bounds:
+		footprint = PlacementSurfaceQueries.get_rotated_planar_half_extents(footprint, preview_item.rotation.y)
 	var local_x: float = preview_item.global_position.x - room_origin.x
 	var local_z: float = preview_item.global_position.z - room_origin.z
 

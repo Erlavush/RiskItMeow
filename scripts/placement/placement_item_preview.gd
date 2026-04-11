@@ -105,7 +105,8 @@ func _clear_content() -> void:
 func _prepare_placeable_for_preview(placeable: SimpleWoodChair) -> void:
 	placeable.collision_layer = 0
 	placeable.collision_mask = 0
-	placeable.process_mode = Node.PROCESS_MODE_DISABLED
+	var disabled_process_mode: Node.ProcessMode = Node.PROCESS_MODE_DISABLED
+	placeable.process_mode = disabled_process_mode
 	placeable.set_preview_mode(false)
 	placeable.set_camera_cutaway(false)
 	var collision_shape := placeable.get_node_or_null("CollisionShape3D") as CollisionShape3D

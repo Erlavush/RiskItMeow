@@ -68,10 +68,26 @@ func get_day_progress() -> float:
 
 func set_day_time(ticks: int) -> void:
 	_day_time = wrapi(ticks, 0, TICKS_PER_DAY)
+	_tick_accumulator = 0.0
 	time_changed.emit(_game_time, _day_time, _partial_tick)
 
+func set_daylight_cycle_enabled(enabled: bool) -> void:
+	daylight_cycle_enabled = bool(enabled)
+	_tick_accumulator = 0.0
+	time_changed.emit(_game_time, _day_time, _partial_tick)
+
+func is_daylight_cycle_enabled() -> bool:
+	return daylight_cycle_enabled
+
+func set_time_scale(scale_value: float) -> void:
+	time_scale = maxf(scale_value, 0.1)
+	time_changed.emit(_game_time, _day_time, _partial_tick)
+
+func get_time_scale() -> float:
+	return time_scale
+
 func get_clock_display_day_time() -> int:
-	return (_day_time + CLOCK_DISPLAY_OFFSET_TICKS) % TICKS_PER_DAY
+	return get_clock_display_day_time_for(_day_time)
 
 func get_hour_hand_rotation_radians(partial_tick: float = -1.0) -> float:
 	var render_partial_tick := _partial_tick if partial_tick < 0.0 else partial_tick
@@ -94,3 +110,19 @@ static func get_minute(day_time: int, partial_tick: float) -> float:
 
 static func get_second(day_time: int, partial_tick: float) -> float:
 	return lerpf(float(day_time - 1), float(day_time), partial_tick) / 20.0
+
+static func get_clock_display_day_time_for(day_time: int) -> int:
+	return (wrapi(day_time, 0, TICKS_PER_DAY) + CLOCK_DISPLAY_OFFSET_TICKS) % TICKS_PER_DAY
+
+static func format_clock_time(day_time: int) -> String:
+	var display_day_time := get_clock_display_day_time_for(day_time)
+	var total_minutes := int(round(float(display_day_time % 1000) * 60.0 / 1000.0))
+	var hour_24 := int(floor(float(display_day_time) / 1000.0)) % 24
+	if total_minutes >= 60:
+		total_minutes -= 60
+		hour_24 = (hour_24 + 1) % 24
+	var meridiem := "AM" if hour_24 < 12 else "PM"
+	var hour_12 := hour_24 % 12
+	if hour_12 == 0:
+		hour_12 = 12
+	return "%02d:%02d %s" % [hour_12, total_minutes, meridiem]

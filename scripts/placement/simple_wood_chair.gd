@@ -116,7 +116,7 @@ func get_visual_scale() -> Vector3:
 func get_visual_y_offset() -> float:
 	return VISUAL_Y_OFFSET
 
-func get_runtime_shadow_cast_setting() -> int:
+func get_runtime_shadow_cast_setting() -> GeometryInstance3D.ShadowCastingSetting:
 	return GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 func set_preview_mode(value: bool) -> void:
@@ -225,7 +225,7 @@ func _apply_preview_color() -> void:
 		_visual_root.visible = _is_preview or not _camera_cutaway
 
 	if not _is_preview:
-		var runtime_shadow_cast := get_runtime_shadow_cast_setting()
+		var runtime_shadow_cast: GeometryInstance3D.ShadowCastingSetting = get_runtime_shadow_cast_setting()
 		for mesh_instance in _mesh_instances:
 			mesh_instance.visible = not _camera_cutaway
 			mesh_instance.cast_shadow = runtime_shadow_cast
