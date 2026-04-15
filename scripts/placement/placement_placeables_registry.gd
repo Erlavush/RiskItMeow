@@ -13,16 +13,16 @@ var window_version := 0
 var render_version := 0
 
 var _dirty := true
-var _all_placeables: Array[SimpleWoodChair] = []
-var _root_placeables: Array[SimpleWoodChair] = []
-var _wall_back_placeables: Array[SimpleWoodChair] = []
-var _wall_left_placeables: Array[SimpleWoodChair] = []
-var _wall_front_placeables: Array[SimpleWoodChair] = []
-var _wall_right_placeables: Array[SimpleWoodChair] = []
-var _ceiling_placeables: Array[SimpleWoodChair] = []
-var _wall_opening_placeables: Array[SimpleWoodChair] = []
-var _support_surface_hosts: Array[SimpleWoodChair] = []
-var _window_placeables: Array[SimpleWoodChair] = []
+var _all_placeables: Array[PlaceableItem] = []
+var _root_placeables: Array[PlaceableItem] = []
+var _wall_back_placeables: Array[PlaceableItem] = []
+var _wall_left_placeables: Array[PlaceableItem] = []
+var _wall_front_placeables: Array[PlaceableItem] = []
+var _wall_right_placeables: Array[PlaceableItem] = []
+var _ceiling_placeables: Array[PlaceableItem] = []
+var _wall_opening_placeables: Array[PlaceableItem] = []
+var _support_surface_hosts: Array[PlaceableItem] = []
+var _window_placeables: Array[PlaceableItem] = []
 var _by_instance_id: Dictionary = {}
 
 func invalidate_structure() -> void:
@@ -81,15 +81,15 @@ func clear() -> void:
 	_window_placeables.clear()
 	_by_instance_id.clear()
 
-func get_all_placeables() -> Array[SimpleWoodChair]:
+func get_all_placeables() -> Array[PlaceableItem]:
 	rebuild_if_needed()
 	return _all_placeables
 
-func get_root_placeables() -> Array[SimpleWoodChair]:
+func get_root_placeables() -> Array[PlaceableItem]:
 	rebuild_if_needed()
 	return _root_placeables
 
-func get_wall_placeables_for_surface(surface_name: String) -> Array[SimpleWoodChair]:
+func get_wall_placeables_for_surface(surface_name: String) -> Array[PlaceableItem]:
 	rebuild_if_needed()
 	match surface_name:
 		RoomConstants.WALL_BACK:
@@ -103,17 +103,17 @@ func get_wall_placeables_for_surface(surface_name: String) -> Array[SimpleWoodCh
 		_:
 			return []
 
-func get_wall_opening_placeables() -> Array[SimpleWoodChair]:
+func get_wall_opening_placeables() -> Array[PlaceableItem]:
 	rebuild_if_needed()
 	return _wall_opening_placeables
 
-func get_ceiling_placeables() -> Array[SimpleWoodChair]:
+func get_ceiling_placeables() -> Array[PlaceableItem]:
 	rebuild_if_needed()
 	return _ceiling_placeables
 
-func get_support_surface_hosts(preview_item: SimpleWoodChair = null, render_state: PlacementRenderState = null) -> Array[SimpleWoodChair]:
+func get_support_surface_hosts(preview_item: PlaceableItem = null, render_state: PlacementRenderState = null) -> Array[PlaceableItem]:
 	rebuild_if_needed()
-	var hosts: Array[SimpleWoodChair] = []
+	var hosts: Array[PlaceableItem] = []
 	for host in _support_surface_hosts:
 		if host == null or not is_instance_valid(host):
 			continue
@@ -124,18 +124,18 @@ func get_support_surface_hosts(preview_item: SimpleWoodChair = null, render_stat
 		hosts.append(host)
 	return hosts
 
-func get_window_placeables() -> Array[SimpleWoodChair]:
+func get_window_placeables() -> Array[PlaceableItem]:
 	rebuild_if_needed()
 	return _window_placeables
 
-func get_placeable_by_instance_id(instance_id: String) -> SimpleWoodChair:
+func get_placeable_by_instance_id(instance_id: String) -> PlaceableItem:
 	if instance_id.is_empty():
 		return null
 	rebuild_if_needed()
-	return _by_instance_id.get(instance_id, null) as SimpleWoodChair
+	return _by_instance_id.get(instance_id, null) as PlaceableItem
 
-func collect_placeable_subtree(root_placeable: SimpleWoodChair) -> Array[SimpleWoodChair]:
-	var subtree: Array[SimpleWoodChair] = []
+func collect_placeable_subtree(root_placeable: PlaceableItem) -> Array[PlaceableItem]:
+	var subtree: Array[PlaceableItem] = []
 	if root_placeable == null or not is_instance_valid(root_placeable):
 		return subtree
 
@@ -145,14 +145,14 @@ func collect_placeable_subtree(root_placeable: SimpleWoodChair) -> Array[SimpleW
 
 func _collect_placeables_recursive(node: Node) -> void:
 	for child in node.get_children():
-		var placeable := child as SimpleWoodChair
+		var placeable := child as PlaceableItem
 		if placeable != null:
 			_register_placeable(placeable, node == placed_items_root)
 			_collect_placeables_recursive(placeable)
 			continue
 		_collect_placeables_recursive(child)
 
-func _register_placeable(placeable: SimpleWoodChair, is_root_placeable: bool) -> void:
+func _register_placeable(placeable: PlaceableItem, is_root_placeable: bool) -> void:
 	if placeable == null or not is_instance_valid(placeable):
 		return
 
@@ -188,9 +188,9 @@ func _register_placeable(placeable: SimpleWoodChair, is_root_placeable: bool) ->
 		if not instance_id.is_empty():
 			_by_instance_id[instance_id] = placeable
 
-func _collect_placeable_descendants(node: Node, output: Array[SimpleWoodChair]) -> void:
+func _collect_placeable_descendants(node: Node, output: Array[PlaceableItem]) -> void:
 	for child in node.get_children():
-		var placeable := child as SimpleWoodChair
+		var placeable := child as PlaceableItem
 		if placeable != null:
 			output.append(placeable)
 			_collect_placeable_descendants(placeable, output)

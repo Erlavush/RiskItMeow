@@ -5,7 +5,7 @@ var placement_manager
 var room_shell: RoomShell
 var wall_openings_signature := ""
 
-func sync(placed_items_root: Node3D, preview_item: SimpleWoodChair, active_surface_name: String, placement_active: bool) -> bool:
+func sync(placed_items_root: Node3D, preview_item: PlaceableItem, active_surface_name: String, placement_active: bool) -> bool:
 	if room_shell == null and placement_manager != null:
 		room_shell = placement_manager._room_shell
 	if room_shell == null or placement_manager == null:
@@ -51,7 +51,7 @@ func sync(placed_items_root: Node3D, preview_item: SimpleWoodChair, active_surfa
 		room_shell.set_runtime_wall_openings(surface_name, openings)
 	return true
 
-func append_wall_opening_for_placeable(openings_by_surface: Dictionary, placeable: SimpleWoodChair, surface_name: String) -> void:
+func append_wall_opening_for_placeable(openings_by_surface: Dictionary, placeable: PlaceableItem, surface_name: String) -> void:
 	if placeable == null or not is_instance_valid(placeable) or room_shell == null or not RoomConstants.is_wall_surface(surface_name):
 		return
 

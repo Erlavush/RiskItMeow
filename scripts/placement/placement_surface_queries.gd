@@ -1,7 +1,7 @@
 class_name PlacementSurfaceQueries
 extends RefCounted
 
-static func get_mount_kind(item: SimpleWoodChair) -> String:
+static func get_mount_kind(item: PlaceableItem) -> String:
 	return item.get_primary_mount_kind() if item != null else RoomConstants.MOUNT_FLOOR
 
 static func snap_position_to_grid(room_shell: RoomShell, target_position: Vector3, grid_size: float) -> Vector3:
@@ -51,7 +51,7 @@ static func clamp_planar_position(room_shell: RoomShell, target_position: Vector
 		_clamp_or_center(target_position.z, min_z, max_z)
 	)
 
-static func snap_wall_position(room_shell: RoomShell, active_surface_name: String, target_position: Vector3, wall_snap_size: float, preview_item: SimpleWoodChair = null) -> Vector3:
+static func snap_wall_position(room_shell: RoomShell, active_surface_name: String, target_position: Vector3, wall_snap_size: float, preview_item: PlaceableItem = null) -> Vector3:
 	if room_shell == null:
 		return target_position
 
@@ -68,7 +68,7 @@ static func snap_wall_position(room_shell: RoomShell, active_surface_name: Strin
 	var snapped_vertical := vertical_bounds.x + (float(vertical_index) + 0.5) * wall_snap_size
 	return build_wall_mount_position(room_shell, active_surface_name, snapped_horizontal, snapped_vertical, preview_item)
 
-static func clamp_wall_position(room_shell: RoomShell, active_surface_name: String, target_position: Vector3, preview_item: SimpleWoodChair = null) -> Vector3:
+static func clamp_wall_position(room_shell: RoomShell, active_surface_name: String, target_position: Vector3, preview_item: PlaceableItem = null) -> Vector3:
 	if room_shell == null or preview_item == null:
 		return target_position
 
@@ -88,10 +88,10 @@ static func clamp_wall_position(room_shell: RoomShell, active_surface_name: Stri
 	)
 	return build_wall_mount_position(room_shell, active_surface_name, clamped_horizontal, clamped_vertical, preview_item)
 
-static func get_wall_snap_size(preview_item: SimpleWoodChair, grid_size: float, wall_snap_size: float) -> float:
+static func get_wall_snap_size(preview_item: PlaceableItem, grid_size: float, wall_snap_size: float) -> float:
 	return wall_snap_size if is_wall_placeable(preview_item) else grid_size
 
-static func get_supported_wall_surfaces(preview_item: SimpleWoodChair) -> Array[String]:
+static func get_supported_wall_surfaces(preview_item: PlaceableItem) -> Array[String]:
 	var surfaces: Array[String] = []
 	if preview_item == null:
 		for surface_name in RoomConstants.WALL_SURFACES:
@@ -108,7 +108,7 @@ static func get_supported_wall_surfaces(preview_item: SimpleWoodChair) -> Array[
 		surfaces.append(String(surface_name))
 	return surfaces
 
-static func try_get_best_supported_wall_hit(camera: Camera3D, room_shell: RoomShell, preview_item: SimpleWoodChair, mouse_position: Vector2) -> Dictionary:
+static func try_get_best_supported_wall_hit(camera: Camera3D, room_shell: RoomShell, preview_item: PlaceableItem, mouse_position: Vector2) -> Dictionary:
 	var best_hit := {"valid": false}
 	var best_distance := INF
 	for surface_name in get_supported_wall_surfaces(preview_item):
@@ -221,10 +221,10 @@ static func raycast_from_mouse(space_state: PhysicsDirectSpaceState3D, camera: C
 	ray_query.collide_with_bodies = true
 	return space_state.intersect_ray(ray_query)
 
-static func get_floor_angle_around_preview(camera: Camera3D, room_shell: RoomShell, preview_item: SimpleWoodChair, mouse_position: Vector2) -> float:
+static func get_floor_angle_around_preview(camera: Camera3D, room_shell: RoomShell, preview_item: PlaceableItem, mouse_position: Vector2) -> float:
 	return get_planar_angle_around_preview(camera, room_shell, preview_item, mouse_position, RoomConstants.FLOOR_SURFACE)
 
-static func get_planar_angle_around_preview(camera: Camera3D, room_shell: RoomShell, preview_item: SimpleWoodChair, mouse_position: Vector2, surface_name: String) -> float:
+static func get_planar_angle_around_preview(camera: Camera3D, room_shell: RoomShell, preview_item: PlaceableItem, mouse_position: Vector2, surface_name: String) -> float:
 	if preview_item == null:
 		return 0.0
 
@@ -253,7 +253,7 @@ static func build_wall_surface_position(room_shell: RoomShell, surface_name: Str
 		_:
 			return Vector3(horizontal_value, vertical_value, room_shell.global_position.z)
 
-static func build_wall_mount_position(room_shell: RoomShell, surface_name: String, horizontal_value: float, vertical_value: float, preview_item: SimpleWoodChair = null) -> Vector3:
+static func build_wall_mount_position(room_shell: RoomShell, surface_name: String, horizontal_value: float, vertical_value: float, preview_item: PlaceableItem = null) -> Vector3:
 	if room_shell == null:
 		return Vector3(horizontal_value, vertical_value, 0.0)
 
@@ -286,13 +286,13 @@ static func get_wall_interior_normal(surface_name: String) -> Vector3:
 		_:
 			return Vector3.ZERO
 
-static func is_wall_placeable(item: SimpleWoodChair) -> bool:
+static func is_wall_placeable(item: PlaceableItem) -> bool:
 	return get_mount_kind(item) == RoomConstants.MOUNT_WALL
 
-static func is_ceiling_placeable(item: SimpleWoodChair) -> bool:
+static func is_ceiling_placeable(item: PlaceableItem) -> bool:
 	return get_mount_kind(item) == RoomConstants.MOUNT_CEILING
 
-static func is_support_surface_placeable(item: SimpleWoodChair) -> bool:
+static func is_support_surface_placeable(item: PlaceableItem) -> bool:
 	return get_mount_kind(item) == RoomConstants.MOUNT_SURFACE
 
 static func _clamp_or_center(value: float, min_value: float, max_value: float) -> float:

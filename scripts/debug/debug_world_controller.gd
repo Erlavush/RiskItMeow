@@ -99,7 +99,7 @@ var _all_item_defs: Array[Dictionary] = []
 var _filtered_item_defs: Array[Dictionary] = []
 var _selected_filtered_index := -1
 var _current_item_id := ""
-var _current_item: SimpleWoodChair
+var _current_item: PlaceableItem
 var _current_item_def: Dictionary = {}
 var _has_unsaved_changes := false
 var _syncing_controls := false
@@ -934,8 +934,8 @@ func _position_current_item() -> void:
 		_:
 			_current_item.position = Vector3.ZERO
 
-func _create_item_instance(item_def: Dictionary) -> SimpleWoodChair:
-	return PlacementInventoryCatalog.create_item_instance(item_def) as SimpleWoodChair
+func _create_item_instance(item_def: Dictionary) -> PlaceableItem:
+	return PlacementInventoryCatalog.create_item_instance(item_def) as PlaceableItem
 
 func _build_current_item_overlays() -> void:
 	if _current_item == null:
@@ -1457,7 +1457,7 @@ func _update_header_labels() -> void:
 	var category = String(_current_item_def.get("category", "Miscellaneous"))
 	var mount_text = PlacementInventoryCatalog.get_mount_badge_text(_current_item_def)
 	_title_label.text = display_name
-	_meta_label.text = "%s • %s • %d / %d" % [category, mount_text, _selected_filtered_index + 1, _filtered_item_defs.size()]
+	_meta_label.text = "%s â€¢ %s â€¢ %d / %d" % [category, mount_text, _selected_filtered_index + 1, _filtered_item_defs.size()]
 
 func _update_summary() -> void:
 	if _edit_summary_label == null:

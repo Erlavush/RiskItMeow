@@ -1,6 +1,6 @@
 @tool
 class_name WoodenBlockClockPlaceable
-extends SimpleWoodChair
+extends PlaceableItem
 
 const CLOCK_DISPLAY_NAME := "Wooden Block Clock"
 const BODY_SCENE_PATH := "res://assets/props/tanuki_decor/wooden_block_clock/wooden_block_clock.glb"

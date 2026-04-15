@@ -52,7 +52,7 @@ static func serialize_layout(placed_items_root: Node3D, item_id_resolver: Callab
 
 static func _serialize_placeables_recursive(node: Node, item_id_resolver: Callable, instance_id_resolver: Callable, output: Array[Dictionary]) -> void:
 	for child in node.get_children():
-		var placeable := child as SimpleWoodChair
+		var placeable := child as PlaceableItem
 		if placeable != null:
 			var item_id := String(item_id_resolver.call(placeable))
 			if not item_id.is_empty():
@@ -61,7 +61,7 @@ static func _serialize_placeables_recursive(node: Node, item_id_resolver: Callab
 			continue
 		_serialize_placeables_recursive(child, item_id_resolver, instance_id_resolver, output)
 
-static func _serialize_placeable(placeable: SimpleWoodChair, item_id: String, instance_id_resolver: Callable) -> Dictionary:
+static func _serialize_placeable(placeable: PlaceableItem, item_id: String, instance_id_resolver: Callable) -> Dictionary:
 	var instance_id := String(instance_id_resolver.call(placeable))
 	var entry := {
 		"instance_id": instance_id,
@@ -69,7 +69,7 @@ static func _serialize_placeable(placeable: SimpleWoodChair, item_id: String, in
 		"rotation_y": snappedf(placeable.rotation.y, ROTATION_PRECISION),
 	}
 
-	var host_placeable := placeable.get_parent() as SimpleWoodChair
+	var host_placeable := placeable.get_parent() as PlaceableItem
 	if host_placeable != null:
 		entry["position"] = serialize_vector3(placeable.position)
 		entry["attachment"] = {

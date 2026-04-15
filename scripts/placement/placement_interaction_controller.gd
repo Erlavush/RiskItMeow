@@ -81,7 +81,7 @@ func handle_unhandled_input(event: InputEvent) -> bool:
 			if placement_manager._is_pointer_over_placement_ui():
 				return false
 
-			var picked_item: SimpleWoodChair = placement_manager._pick_placeable_item(mouse_button.position)
+			var picked_item: PlaceableItem = placement_manager._pick_placeable_item(mouse_button.position)
 			if picked_item != null:
 				placement_manager._begin_edit_session(picked_item)
 				placement_manager.get_viewport().set_input_as_handled()

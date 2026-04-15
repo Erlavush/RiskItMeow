@@ -94,8 +94,8 @@ var _player: Node
 var _placed_items_root: Node3D
 var _grid_overlay: MeshInstance3D
 var _gizmo_root: Node3D
-var _preview_item: SimpleWoodChair
-var _active_support_host: SimpleWoodChair
+var _preview_item: PlaceableItem
+var _active_support_host: PlaceableItem
 var _active_support_surface_id := DEFAULT_SUPPORT_SURFACE_ID
 var _placement_query_shape := BoxShape3D.new()
 var _gizmo_handle_nodes := {}
@@ -558,13 +558,13 @@ func _get_item_display_name(item_id: String) -> String:
 func _get_active_item_display_name() -> String:
 	return _get_item_display_name(_active_item_id if not _active_item_id.is_empty() else "item")
 
-func _is_wall_placeable(item: SimpleWoodChair) -> bool:
+func _is_wall_placeable(item: PlaceableItem) -> bool:
 	return PlacementSurfaceQueries.is_wall_placeable(item)
 
-func _is_ceiling_placeable(item: SimpleWoodChair) -> bool:
+func _is_ceiling_placeable(item: PlaceableItem) -> bool:
 	return PlacementSurfaceQueries.is_ceiling_placeable(item)
 
-func _is_support_surface_placeable(item: SimpleWoodChair) -> bool:
+func _is_support_surface_placeable(item: PlaceableItem) -> bool:
 	return PlacementSurfaceQueries.is_support_surface_placeable(item)
 
 func _active_preview_is_wall_placeable() -> bool:
@@ -629,7 +629,7 @@ func _refresh_editor_preview_from_saved_layout(force: bool = false) -> void:
 func _clear_editor_preview_layout() -> void:
 	_layout_persistence.clear_editor_preview_layout()
 
-func _instantiate_saved_item(item_entry: Dictionary, loaded_instances: Dictionary = {}) -> SimpleWoodChair:
+func _instantiate_saved_item(item_entry: Dictionary, loaded_instances: Dictionary = {}) -> PlaceableItem:
 	return _layout_persistence.instantiate_saved_item(item_entry, loaded_instances)
 
 func _autosave_room_layout() -> void:
@@ -710,24 +710,24 @@ func clear_wall_surface_cutaways() -> void:
 func _apply_cutaway_to_surface(_surface_name: String) -> void:
 	_render_state.apply_cutaway_to_surface(_surface_name)
 
-func _apply_cutaway_to_placeable(placeable: SimpleWoodChair) -> void:
+func _apply_cutaway_to_placeable(placeable: PlaceableItem) -> void:
 	_render_state.apply_cutaway_to_placeable(placeable)
 
-func _append_wall_opening_for_placeable(openings_by_surface: Dictionary, placeable: SimpleWoodChair, surface_name: String) -> void:
+func _append_wall_opening_for_placeable(openings_by_surface: Dictionary, placeable: PlaceableItem, surface_name: String) -> void:
 	_wall_opening_sync.append_wall_opening_for_placeable(openings_by_surface, placeable, surface_name)
 
-func _create_item_instance(item_id: String) -> SimpleWoodChair:
+func _create_item_instance(item_id: String) -> PlaceableItem:
 	var item_def: Dictionary = _get_item_definition(item_id)
 	if item_def.is_empty():
 		return null
-	return PlacementInventoryCatalog.create_item_instance(item_def) as SimpleWoodChair
+	return PlacementInventoryCatalog.create_item_instance(item_def) as PlaceableItem
 
-func _create_item_instance_from_definition(item_def: Dictionary) -> SimpleWoodChair:
+func _create_item_instance_from_definition(item_def: Dictionary) -> PlaceableItem:
 	if item_def.is_empty():
 		return null
 	return _create_item_instance(String(item_def.get("id", "")))
 
-func _activate_preview_session(preview_item: SimpleWoodChair, item_id: String, session_kind: String, rename_preview: bool) -> void:
+func _activate_preview_session(preview_item: PlaceableItem, item_id: String, session_kind: String, rename_preview: bool) -> void:
 	if preview_item == null:
 		return
 
@@ -777,7 +777,7 @@ func _start_inventory_placement(item_id: String) -> void:
 	_activate_preview_session(preview_item, item_id, PLACEMENT_SESSION_NEW, true)
 	_update_preview_from_mouse(true)
 
-func _resolve_item_id_for_placeable(placeable: SimpleWoodChair) -> String:
+func _resolve_item_id_for_placeable(placeable: PlaceableItem) -> String:
 	if placeable == null:
 		return ""
 	if placeable.has_meta("item_id"):
@@ -794,7 +794,7 @@ func _resolve_item_id_for_placeable(placeable: SimpleWoodChair) -> String:
 
 	return ""
 
-func _get_placeable_instance_id(placeable: SimpleWoodChair) -> String:
+func _get_placeable_instance_id(placeable: PlaceableItem) -> String:
 	if placeable == null:
 		return ""
 	if placeable.has_meta("instance_id"):
@@ -805,7 +805,7 @@ func _get_placeable_instance_id(placeable: SimpleWoodChair) -> String:
 	placeable.set_meta("instance_id", instance_id)
 	return instance_id
 
-func _set_room_attachment_metadata(placeable: SimpleWoodChair, surface_name: String) -> void:
+func _set_room_attachment_metadata(placeable: PlaceableItem, surface_name: String) -> void:
 	if placeable == null:
 		return
 	placeable.set_meta("attachment_kind", RoomConstants.ATTACHMENT_ROOM)
@@ -815,7 +815,7 @@ func _set_room_attachment_metadata(placeable: SimpleWoodChair, surface_name: Str
 	if placeable.has_meta("host_surface_id"):
 		placeable.remove_meta("host_surface_id")
 
-func _set_support_attachment_metadata(placeable: SimpleWoodChair, host: SimpleWoodChair, surface_id: String) -> void:
+func _set_support_attachment_metadata(placeable: PlaceableItem, host: PlaceableItem, surface_id: String) -> void:
 	if placeable == null or host == null:
 		return
 	placeable.set_meta("attachment_kind", RoomConstants.ATTACHMENT_SUPPORT_SURFACE)
@@ -823,12 +823,12 @@ func _set_support_attachment_metadata(placeable: SimpleWoodChair, host: SimpleWo
 	placeable.set_meta("host_instance_id", _get_placeable_instance_id(host))
 	placeable.set_meta("host_surface_id", surface_id if not surface_id.is_empty() else DEFAULT_SUPPORT_SURFACE_ID)
 
-func _get_placeable_attachment_kind(placeable: SimpleWoodChair) -> String:
+func _get_placeable_attachment_kind(placeable: PlaceableItem) -> String:
 	if placeable == null:
 		return RoomConstants.ATTACHMENT_ROOM
 	if placeable.has_meta("attachment_kind"):
 		return String(placeable.get_meta("attachment_kind"))
-	return RoomConstants.ATTACHMENT_SUPPORT_SURFACE if placeable.get_parent() is SimpleWoodChair else RoomConstants.ATTACHMENT_ROOM
+	return RoomConstants.ATTACHMENT_SUPPORT_SURFACE if placeable.get_parent() is PlaceableItem else RoomConstants.ATTACHMENT_ROOM
 
 func _build_saved_attachment(item_entry: Dictionary) -> Dictionary:
 	var raw_attachment: Variant = item_entry.get("attachment", {})
@@ -851,7 +851,7 @@ func _build_saved_attachment(item_entry: Dictionary) -> Dictionary:
 		"surface": String(item_entry.get("placement_surface", RoomConstants.FLOOR_SURFACE)),
 	}
 
-func _ensure_placeable_metadata(placeable: SimpleWoodChair, item_id: String, instance_id: String = "") -> void:
+func _ensure_placeable_metadata(placeable: PlaceableItem, item_id: String, instance_id: String = "") -> void:
 	if placeable == null or item_id.is_empty():
 		return
 	placeable.set_meta("item_id", item_id)
@@ -861,7 +861,7 @@ func _ensure_placeable_metadata(placeable: SimpleWoodChair, item_id: String, ins
 	else:
 		_get_placeable_instance_id(placeable)
 
-func _begin_edit_session(placeable: SimpleWoodChair) -> void:
+func _begin_edit_session(placeable: PlaceableItem) -> void:
 	if placeable == null:
 		return
 
@@ -878,7 +878,7 @@ func _begin_edit_session(placeable: SimpleWoodChair) -> void:
 	_activate_preview_session(placeable, item_id, PLACEMENT_SESSION_EDIT, false)
 	_active_surface_name = _editing_original_surface_name
 	if _active_preview_is_support_surface_placeable():
-		_active_support_host = _editing_original_parent as SimpleWoodChair
+		_active_support_host = _editing_original_parent as PlaceableItem
 		_active_support_surface_id = _editing_original_host_surface_id
 	if _active_preview_is_wall_placeable() and RoomConstants.is_wall_surface(_active_surface_name):
 		_preview_item.rotation.y = RoomConstants.get_wall_rotation(_active_surface_name) + _preview_item.get_wall_rotation_offset()
@@ -935,9 +935,9 @@ func _restore_or_discard_active_preview(refund_stock: bool) -> void:
 		PLACEMENT_SESSION_EDIT:
 			if _editing_original_parent != null and is_instance_valid(_editing_original_parent) and _preview_item.get_parent() != _editing_original_parent:
 				_preview_item.reparent(_editing_original_parent, true)
-			if _get_placeable_attachment_kind(_preview_item) == RoomConstants.ATTACHMENT_SUPPORT_SURFACE or _editing_original_parent is SimpleWoodChair:
+			if _get_placeable_attachment_kind(_preview_item) == RoomConstants.ATTACHMENT_SUPPORT_SURFACE or _editing_original_parent is PlaceableItem:
 				_preview_item.transform = _editing_original_local_transform
-				var original_host := _editing_original_parent as SimpleWoodChair
+				var original_host := _editing_original_parent as PlaceableItem
 				if original_host != null:
 					_set_support_attachment_metadata(_preview_item, original_host, _editing_original_host_surface_id)
 			else:
@@ -1385,7 +1385,7 @@ func _evaluate_support_surface_preview_transform() -> Dictionary:
 
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = _placement_query_shape
-	query.collision_mask = SimpleWoodChair.COLLISION_LAYER
+	query.collision_mask = PlaceableItem.COLLISION_LAYER
 	query.exclude = _get_preview_excluded_rids()
 	query.exclude.append(_active_support_host.get_rid())
 	query.transform = _preview_item.global_transform.translated_local(_preview_item.get_collision_center_offset())
@@ -1604,7 +1604,7 @@ func _pick_interaction_target(mouse_position: Vector2) -> String:
 					return ""
 				return handle_id
 
-	var preview_hit := _raycast_from_mouse(mouse_position, SimpleWoodChair.PREVIEW_PICK_LAYER)
+	var preview_hit := _raycast_from_mouse(mouse_position, PlaceableItem.PREVIEW_PICK_LAYER)
 	if not preview_hit.is_empty():
 		return "move"
 	if _try_get_active_surface_hit(mouse_position).get("valid", false):
@@ -1627,15 +1627,15 @@ func _has_camera_conflicting_placement_target(mouse_position: Vector2) -> bool:
 		_:
 			return false
 
-func _pick_placeable_item(mouse_position: Vector2) -> SimpleWoodChair:
+func _pick_placeable_item(mouse_position: Vector2) -> PlaceableItem:
 	if _is_pointer_over_placement_ui():
 		return null
 
-	var hit := _raycast_from_mouse(mouse_position, SimpleWoodChair.COLLISION_LAYER)
+	var hit := _raycast_from_mouse(mouse_position, PlaceableItem.COLLISION_LAYER)
 	if hit.is_empty():
 		return null
 
-	return hit.get("collider") as SimpleWoodChair
+	return hit.get("collider") as PlaceableItem
 
 func _begin_drag(mode: String, mouse_position: Vector2) -> void:
 	_drag_mode = mode
@@ -1710,7 +1710,7 @@ func _apply_preview_surface_hit(hit: Dictionary) -> void:
 		return
 	_active_surface_name = String(hit.get("surface_name", _active_surface_name))
 	if _active_preview_is_support_surface_placeable():
-		var host := hit.get("host") as SimpleWoodChair
+		var host := hit.get("host") as PlaceableItem
 		var surface_id := String(hit.get("surface_id", DEFAULT_SUPPORT_SURFACE_ID))
 		if host == null:
 			return
@@ -1726,7 +1726,7 @@ func _apply_preview_surface_hit(hit: Dictionary) -> void:
 func _get_active_support_surface_data() -> Dictionary:
 	return _get_support_surface_data(_active_support_host, _active_support_surface_id)
 
-func _get_support_surface_data(host: SimpleWoodChair, surface_id: String) -> Dictionary:
+func _get_support_surface_data(host: PlaceableItem, surface_id: String) -> Dictionary:
 	if host == null:
 		return {}
 	for raw_surface in host.get_support_surfaces():
@@ -1737,7 +1737,7 @@ func _get_support_surface_data(host: SimpleWoodChair, surface_id: String) -> Dic
 			return surface_data
 	return {}
 
-func _get_support_surface_hosts() -> Array[SimpleWoodChair]:
+func _get_support_surface_hosts() -> Array[PlaceableItem]:
 	if _placeables_registry == null:
 		return []
 	return _placeables_registry.get_support_surface_hosts(_preview_item, _render_state)
@@ -1756,7 +1756,7 @@ func _resolve_wall_preview_position(target_position: Vector3) -> Vector3:
 		return _snap_wall_position(target_position)
 	return PlacementSurfaceQueries.clamp_wall_position(_room_shell, _active_surface_name, target_position, _preview_item)
 
-func _resolve_support_surface_local_position(host: SimpleWoodChair, support_surface: Dictionary, target_world_position: Vector3) -> Vector3:
+func _resolve_support_surface_local_position(host: PlaceableItem, support_surface: Dictionary, target_world_position: Vector3) -> Vector3:
 	if host == null or support_surface.is_empty() or _preview_item == null:
 		return Vector3.ZERO
 
@@ -2117,29 +2117,29 @@ func _update_popup_visuals() -> void:
 		PlacementUiStyles.COLOR_TEXT
 	)
 
-func get_wall_opening_placeables_cached() -> Array[SimpleWoodChair]:
+func get_wall_opening_placeables_cached() -> Array[PlaceableItem]:
 	if _placeables_registry == null:
 		return []
 	return _placeables_registry.get_wall_opening_placeables()
 
-func get_window_placeables_cached() -> Array[SimpleWoodChair]:
+func get_window_placeables_cached() -> Array[PlaceableItem]:
 	if _placeables_registry == null:
 		return []
 	return _placeables_registry.get_window_placeables()
 
-func get_wall_placeables_for_surface(surface_name: String) -> Array[SimpleWoodChair]:
+func get_wall_placeables_for_surface(surface_name: String) -> Array[PlaceableItem]:
 	if _placeables_registry == null:
 		return []
 	return _placeables_registry.get_wall_placeables_for_surface(surface_name)
 
-func get_ceiling_placeables() -> Array[SimpleWoodChair]:
+func get_ceiling_placeables() -> Array[PlaceableItem]:
 	if _placeables_registry == null:
 		return []
 	return _placeables_registry.get_ceiling_placeables()
 
-func collect_placeable_subtree(root_placeable: SimpleWoodChair) -> Array[SimpleWoodChair]:
+func collect_placeable_subtree(root_placeable: PlaceableItem) -> Array[PlaceableItem]:
 	if _placeables_registry == null:
-		var subtree: Array[SimpleWoodChair] = []
+		var subtree: Array[PlaceableItem] = []
 		if root_placeable != null and is_instance_valid(root_placeable):
 			subtree.append(root_placeable)
 		return subtree
@@ -2201,14 +2201,14 @@ func _build_gizmo_signature(camera: Camera3D) -> String:
 		camera_position.z,
 	]
 
-func _refund_stock_for_placeable_tree(root_placeable: SimpleWoodChair) -> void:
+func _refund_stock_for_placeable_tree(root_placeable: PlaceableItem) -> void:
 	for placeable in collect_placeable_subtree(root_placeable):
 		var item_id := _resolve_item_id_for_placeable(placeable)
 		if item_id.is_empty():
 			continue
 		_item_stock[item_id] = int(_item_stock.get(item_id, 0)) + 1
 
-func _is_placeable_effectively_cutaway(placeable: SimpleWoodChair) -> bool:
+func _is_placeable_effectively_cutaway(placeable: PlaceableItem) -> bool:
 	return _render_state.is_placeable_effectively_cutaway(placeable)
 
 func _build_wall_openings_signature(openings_by_surface: Dictionary) -> String:
@@ -2218,7 +2218,7 @@ func _notify_room_layout_visuals_changed() -> void:
 	room_layout_visuals_changed.emit()
 
 func _cleanup_stray_placeable_artifacts() -> void:
-	var stray_placeables: Array[SimpleWoodChair] = []
+	var stray_placeables: Array[PlaceableItem] = []
 	_collect_stray_placeables_recursive(self, stray_placeables)
 	for placeable in stray_placeables:
 		if placeable == null or not is_instance_valid(placeable):
@@ -2231,9 +2231,9 @@ func _cleanup_stray_placeable_artifacts() -> void:
 			placeable.get_parent().remove_child(placeable)
 		placeable.queue_free()
 
-func _collect_stray_placeables_recursive(node: Node, output: Array[SimpleWoodChair]) -> void:
+func _collect_stray_placeables_recursive(node: Node, output: Array[PlaceableItem]) -> void:
 	for child in node.get_children():
-		var placeable := child as SimpleWoodChair
+		var placeable := child as PlaceableItem
 		if placeable != null:
 			output.append(placeable)
 			continue

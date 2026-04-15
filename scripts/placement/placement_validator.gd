@@ -4,7 +4,7 @@ extends RefCounted
 static func evaluate_preview_transform(
 	world_3d: World3D,
 	room_shell: RoomShell,
-	preview_item: SimpleWoodChair,
+	preview_item: PlaceableItem,
 	active_surface_name: String,
 	placement_query_shape: Shape3D,
 	excluded_rids: Array[RID] = [],
@@ -33,7 +33,7 @@ static func evaluate_preview_transform(
 
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = placement_query_shape
-	query.collision_mask = SimpleWoodChair.COLLISION_LAYER
+	query.collision_mask = PlaceableItem.COLLISION_LAYER
 	query.exclude = excluded_rids
 	query.transform = Transform3D(
 		Basis.IDENTITY.rotated(Vector3.UP, preview_item.rotation.y),
@@ -48,7 +48,7 @@ static func evaluate_preview_transform(
 static func _evaluate_ceiling_preview_transform(
 	world_3d: World3D,
 	room_shell: RoomShell,
-	preview_item: SimpleWoodChair,
+	preview_item: PlaceableItem,
 	active_surface_name: String,
 	placement_query_shape: Shape3D,
 	excluded_rids: Array[RID] = [],
@@ -76,7 +76,7 @@ static func _evaluate_ceiling_preview_transform(
 
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = placement_query_shape
-	query.collision_mask = SimpleWoodChair.COLLISION_LAYER
+	query.collision_mask = PlaceableItem.COLLISION_LAYER
 	query.exclude = excluded_rids
 	query.transform = Transform3D(
 		Basis.IDENTITY.rotated(Vector3.UP, preview_item.rotation.y),
@@ -90,7 +90,7 @@ static func _evaluate_ceiling_preview_transform(
 static func _evaluate_wall_preview_transform(
 	world_3d: World3D,
 	room_shell: RoomShell,
-	preview_item: SimpleWoodChair,
+	preview_item: PlaceableItem,
 	active_surface_name: String,
 	placement_query_shape: Shape3D,
 	excluded_rids: Array[RID] = []
@@ -117,7 +117,7 @@ static func _evaluate_wall_preview_transform(
 
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = placement_query_shape
-	query.collision_mask = SimpleWoodChair.COLLISION_LAYER
+	query.collision_mask = PlaceableItem.COLLISION_LAYER
 	query.exclude = excluded_rids
 	query.transform = preview_item.global_transform.translated_local(preview_item.get_collision_center_offset())
 	if not world_3d.direct_space_state.intersect_shape(query, 4).is_empty():

@@ -30,7 +30,7 @@ func configure(item_def: Dictionary, item_factory: Callable) -> void:
 	_clear_content()
 	if item_factory == null or not item_factory.is_valid():
 		return
-	var placeable := item_factory.call(item_def) as SimpleWoodChair
+	var placeable := item_factory.call(item_def) as PlaceableItem
 	if placeable == null:
 		return
 	placeable.ensure_runtime_visual_setup()
@@ -102,7 +102,7 @@ func _clear_content() -> void:
 		_content_root.remove_child(child)
 		child.queue_free()
 
-func _prepare_placeable_for_preview(placeable: SimpleWoodChair) -> void:
+func _prepare_placeable_for_preview(placeable: PlaceableItem) -> void:
 	placeable.collision_layer = 0
 	placeable.collision_mask = 0
 	var disabled_process_mode: Node.ProcessMode = Node.PROCESS_MODE_DISABLED
@@ -119,7 +119,7 @@ func _prepare_placeable_for_preview(placeable: SimpleWoodChair) -> void:
 	if footprint != null:
 		footprint.visible = false
 
-func _frame_placeable(placeable: SimpleWoodChair) -> void:
+func _frame_placeable(placeable: PlaceableItem) -> void:
 	var preview_yaw := float(_pending_item_def.get("preview_yaw", 0.0))
 	placeable.rotation.y = preview_yaw
 

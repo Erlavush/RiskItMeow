@@ -184,7 +184,7 @@ func clear_editor_preview_layout() -> void:
 	placement_manager._request_wall_openings_refresh()
 	placement_manager._sync_room_wall_openings()
 
-func instantiate_saved_item(item_entry: Dictionary, loaded_instances: Dictionary = {}) -> SimpleWoodChair:
+func instantiate_saved_item(item_entry: Dictionary, loaded_instances: Dictionary = {}) -> PlaceableItem:
 	if placement_manager == null:
 		return null
 
@@ -192,7 +192,7 @@ func instantiate_saved_item(item_entry: Dictionary, loaded_instances: Dictionary
 	if item_id.is_empty():
 		return null
 
-	var placeable: SimpleWoodChair = placement_manager._create_item_instance(item_id)
+	var placeable: PlaceableItem = placement_manager._create_item_instance(item_id)
 	if placeable == null:
 		return null
 
@@ -208,7 +208,7 @@ func instantiate_saved_item(item_entry: Dictionary, loaded_instances: Dictionary
 
 	if attachment_kind == RoomConstants.ATTACHMENT_SUPPORT_SURFACE:
 		var host_instance_id := String(attachment.get("host_instance_id", ""))
-		var host_placeable := loaded_instances.get(host_instance_id, null) as SimpleWoodChair
+		var host_placeable := loaded_instances.get(host_instance_id, null) as PlaceableItem
 		if host_placeable == null:
 			placeable.free()
 			return null

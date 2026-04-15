@@ -144,7 +144,14 @@ func _get_flow_priority(path: String) -> int:
 func _write_header(out: FileAccess, paths: Array[String]) -> void:
 	out.store_string("RISK IT MEOW — CODEBASE SNAPSHOT\n")
 	out.store_string("================================\n\n")
-	out.store_string("Generated: %s\n" % Time.get_datetime_string_from_system())
+	var utc_time := Time.get_unix_time_from_system()
+	var pht_time := utc_time + (8 * 3600) # UTC+8
+	var pht_dict := Time.get_datetime_dict_from_unix_time(pht_time)
+	var formatted_time := "%04d-%02d-%02d %02d:%02d:%02d PHT" % [
+		pht_dict.year, pht_dict.month, pht_dict.day,
+		pht_dict.hour, pht_dict.minute, pht_dict.second
+	]
+	out.store_string("Generated: %s\n" % formatted_time)
 	out.store_string("Output: %s\n" % OUTPUT_FILE)
 	out.store_string("Included files: %d\n" % paths.size())
 	out.store_string("Scope: project config + gameplay scenes + runtime scripts + shaders.\n")

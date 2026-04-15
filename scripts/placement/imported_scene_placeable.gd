@@ -1,6 +1,6 @@
 @tool
 class_name ImportedScenePlaceable
-extends SimpleWoodChair
+extends PlaceableItem
 
 const MIN_PROP_DIMENSION := 0.08
 const ANCHOR_MODE_FLOOR := "floor"

@@ -37,20 +37,20 @@ func apply_cutaway_to_surface(_surface_name: String) -> void:
 	for root_placeable in _get_cutaway_root_placeables(_surface_name):
 		_apply_cutaway_to_placeable_subtree(root_placeable)
 
-func apply_cutaway_to_placeable(placeable: SimpleWoodChair) -> void:
+func apply_cutaway_to_placeable(placeable: PlaceableItem) -> void:
 	if placeable == null:
 		return
 
 	placeable.set_camera_cutaway(is_placeable_effectively_cutaway(placeable))
 
-func is_placeable_effectively_cutaway(placeable: SimpleWoodChair) -> bool:
+func is_placeable_effectively_cutaway(placeable: PlaceableItem) -> bool:
 	if placement_manager == null:
 		return false
 
 	var current: Node = placeable
 	var resolved_root := _get_placed_items_root()
 	while current != null and current != resolved_root:
-		var current_placeable := current as SimpleWoodChair
+		var current_placeable := current as PlaceableItem
 		if current_placeable != null:
 			if placement_manager._is_ceiling_placeable(current_placeable) and ceiling_surface_cutaway:
 				return true
@@ -68,7 +68,7 @@ func _get_placed_items_root() -> Node3D:
 		return placement_manager._placed_items_root
 	return placed_items_root
 
-func _get_cutaway_root_placeables(surface_name: String) -> Array[SimpleWoodChair]:
+func _get_cutaway_root_placeables(surface_name: String) -> Array[PlaceableItem]:
 	if placement_manager == null:
 		return []
 	if surface_name == RoomConstants.CEILING_SURFACE:
@@ -77,7 +77,7 @@ func _get_cutaway_root_placeables(surface_name: String) -> Array[SimpleWoodChair
 		return placement_manager.get_wall_placeables_for_surface(surface_name)
 	return []
 
-func _apply_cutaway_to_placeable_subtree(root_placeable: SimpleWoodChair) -> void:
+func _apply_cutaway_to_placeable_subtree(root_placeable: PlaceableItem) -> void:
 	if root_placeable == null or placement_manager == null:
 		return
 
@@ -89,7 +89,7 @@ func _apply_cutaway_to_placeable_subtree(root_placeable: SimpleWoodChair) -> voi
 			continue
 		placeable.set_camera_cutaway(is_placeable_effectively_cutaway(placeable))
 
-func _is_preview_placeable(placeable: SimpleWoodChair) -> bool:
+func _is_preview_placeable(placeable: PlaceableItem) -> bool:
 	return placement_manager != null \
 		and bool(placement_manager._placement_active) \
 		and placeable == placement_manager._preview_item

@@ -158,7 +158,7 @@ func _update_bounce_light(total_exposure: float) -> void:
 	_bounce_light.light_energy = minf(1.08, total_exposure * 0.34)
 	_bounce_light.visible = total_exposure > 0.05
 
-func _get_window_placeables() -> Array[SimpleWoodChair]:
+func _get_window_placeables() -> Array[PlaceableItem]:
 	if _placement_manager == null:
 		return []
 	return _placement_manager.get_window_placeables_cached()
