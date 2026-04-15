@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="PlacementCatalogItemResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/placement_catalog_item_resource.gd" id="1_catalog_item"]
+
+[resource]
+script = ExtResource("1_catalog_item")
+id = "window"
+display_name = "Window"
+category = "Windows"
+initial_owned = 3
+factory_type = "imported_scene"
+source_scene_path = "res://assets/props/three_window/scene.gltf"
+mount_kind = "wall"
+mount_kinds = Array[String](["wall"])
+requires_wall_opening = true
+supports_rotation = false
+wall_rotation_offset = 3.1415927
+anchor_mode = "center"
+visual_fit_height = 1.5
+runtime_shadow_cast_setting = 0

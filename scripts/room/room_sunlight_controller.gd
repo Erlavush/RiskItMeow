@@ -2,8 +2,6 @@
 class_name RoomSunlightController
 extends Node3D
 
-const WINDOW_ITEM_IDS := ["window", "window_classic"]
-
 @export var room_shell_path: NodePath
 @export var placement_manager_path: NodePath
 @export var directional_light_path: NodePath
@@ -161,19 +159,9 @@ func _update_bounce_light(total_exposure: float) -> void:
 	_bounce_light.visible = total_exposure > 0.05
 
 func _get_window_placeables() -> Array[SimpleWoodChair]:
-	var windows: Array[SimpleWoodChair] = []
-	if _placement_manager == null or _placement_manager._placed_items_root == null:
-		return windows
-
-	for child in _placement_manager._placed_items_root.get_children():
-		var placeable := child as SimpleWoodChair
-		if placeable == null:
-			continue
-		if not placeable.has_meta("item_id") or not WINDOW_ITEM_IDS.has(String(placeable.get_meta("item_id"))):
-			continue
-		windows.append(placeable)
-
-	return windows
+	if _placement_manager == null:
+		return []
+	return _placement_manager.get_window_placeables_cached()
 
 func _get_or_create_portal_light(instance_id: int) -> SpotLight3D:
 	if _portal_lights.has(instance_id):

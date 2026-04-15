@@ -41,6 +41,12 @@ const PLACEMENT_SESSION_EDIT := "edit"
 const PLACEMENT_SESSION_DUPLICATE := "duplicate"
 
 const GridOverlayShader := preload("res://shaders/grid_overlay.gdshader")
+const PlacementPlaceablesRegistryScript := preload("res://scripts/placement/placement_placeables_registry.gd")
+const PlacementRenderStateScript := preload("res://scripts/placement/placement_render_state.gd")
+const PlacementWallOpeningSyncScript := preload("res://scripts/placement/placement_wall_opening_sync.gd")
+const PlacementLayoutPersistenceScript := preload("res://scripts/placement/placement_layout_persistence.gd")
+const PlacementBrowserUiControllerScript := preload("res://scripts/placement/placement_browser_ui_controller.gd")
+const PlacementInteractionControllerScript := preload("res://scripts/placement/placement_interaction_controller.gd")
 
 var _inventory_item_defs: Array[Dictionary] = PlacementInventoryCatalog.build_item_defs()
 
@@ -56,6 +62,7 @@ var _grid_placement_enabled := true
 var _rotation_snap_enabled := true
 var _editor_mode := EDITOR_MODE_BUILD
 var _browser_mode := BROWSER_MODE_INVENTORY
+@warning_ignore("unused_private_class_variable")
 var _browser_open := false
 var _browser_search_text := ""
 var _selected_inventory_category := ""
@@ -95,32 +102,48 @@ var _gizmo_handle_nodes := {}
 var _gizmo_handle_materials := {}
 var _gizmo_handle_base_colors := {}
 
+@warning_ignore("unused_private_class_variable")
 var _ui_layer: CanvasLayer
+@warning_ignore("unused_private_class_variable")
 var _ui_root: Control
+@warning_ignore("unused_private_class_variable")
 var _browser_toggle_button: Button
+@warning_ignore("unused_private_class_variable")
 var _inventory_panel: PanelContainer
+@warning_ignore("unused_private_class_variable")
 var _browser_layout: VBoxContainer
 var _mode_buttons: Dictionary = {}
 var _browser_mode_buttons: Dictionary = {}
 var _mount_filter_buttons: Dictionary = {}
 var _floor_style_buttons: Dictionary = {}
+@warning_ignore("unused_private_class_variable")
 var _panel_title_label: Label
+@warning_ignore("unused_private_class_variable")
 var _mode_label: Label
+@warning_ignore("unused_private_class_variable")
 var _browser_section_label: Label
 var _status_label: Label
+@warning_ignore("unused_private_class_variable")
 var _floor_style_label: Label
+@warning_ignore("unused_private_class_variable")
 var _browser_search_input: LineEdit
 var _mount_filter_option: OptionButton
 var _category_filter_option: OptionButton
 var _browser_scroll: ScrollContainer
+@warning_ignore("unused_private_class_variable")
 var _browser_grid: GridContainer
 var _tools_toggle_button: Button
 var _tools_section: VBoxContainer
 var _status_shell: PanelContainer
+@warning_ignore("unused_private_class_variable")
 var _grid_toggle_button: Button
+@warning_ignore("unused_private_class_variable")
 var _rotation_toggle_button: Button
+@warning_ignore("unused_private_class_variable")
 var _save_button: Button
+@warning_ignore("unused_private_class_variable")
 var _load_button: Button
+@warning_ignore("unused_private_class_variable")
 var _clear_room_button: Button
 var _popup_panel: PanelContainer
 var _popup_status_label: Label
@@ -130,11 +153,17 @@ var _cancel_button: Button
 var _duplicate_button: Button
 var _delete_button: Button
 var _popup_edit_row: HBoxContainer
+@warning_ignore("unused_private_class_variable")
 var _editor_preview_poll_time := 0.0
+@warning_ignore("unused_private_class_variable")
 var _editor_preview_layout_signature := ""
 var _editor_default_floor_style := FLOOR_STYLE_COZY_BROWN
 var _wall_openings_signature := ""
+var _last_wall_preview_signature := ""
+var _last_popup_signature := ""
+var _last_gizmo_signature := ""
 var _popup_visual_signature := ""
+@warning_ignore("unused_private_class_variable")
 var _browser_panel_tween: Tween
 var _debug_world_active := false
 var _wall_surface_cutaway_states: Dictionary = {
@@ -144,6 +173,13 @@ var _wall_surface_cutaway_states: Dictionary = {
 	RoomConstants.WALL_RIGHT: false,
 }
 var _ceiling_surface_cutaway := false
+var _placeables_registry = PlacementPlaceablesRegistryScript.new()
+var _render_state = PlacementRenderStateScript.new()
+var _wall_opening_sync = PlacementWallOpeningSyncScript.new()
+var _layout_persistence = PlacementLayoutPersistenceScript.new()
+var _browser_ui
+var _interaction = PlacementInteractionControllerScript.new()
+var _wall_openings_dirty := true
 
 func _ready() -> void:
 	_room_shell = get_node_or_null(room_shell_path) as RoomShell
@@ -156,6 +192,22 @@ func _ready() -> void:
 		_placed_items_root = Node3D.new()
 		_placed_items_root.name = "PlacedItems"
 		add_child(_placed_items_root)
+
+	_render_state.placement_manager = self
+	_render_state.room_shell = _room_shell
+	_render_state.placed_items_root = _placed_items_root
+	_placeables_registry.placement_manager = self
+	_placeables_registry.placed_items_root = _placed_items_root
+	_wall_opening_sync.placement_manager = self
+	_wall_opening_sync.room_shell = _room_shell
+	_layout_persistence.placement_manager = self
+	_layout_persistence.room_shell = _room_shell
+	_layout_persistence.placed_items_root = _placed_items_root
+	_interaction.placement_manager = self
+	_interaction.room_shell = _room_shell
+	_interaction.room_camera_controller = _room_camera_controller
+	_interaction.player = _player
+	_interaction.placed_items_root = _placed_items_root
 
 	if Engine.is_editor_hint():
 		_editor_default_floor_style = _get_current_floor_style()
@@ -192,101 +244,13 @@ func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		_process_editor_preview(_delta)
 		return
-
-	if not _placement_active or _preview_item == null:
-		_popup_panel.visible = false
-		_gizmo_root.visible = false
-		return
-
-	if _drag_mode == "":
-		_hover_target = _pick_interaction_target(get_viewport().get_mouse_position())
-	else:
-		_hover_target = _drag_mode
-
-	if _preview_item != null:
-		_preview_item.set_hovered(_hover_target == "move" or _drag_mode == "move")
-
-	_update_gizmo_hover_state()
-	_update_popup_position()
-	_update_gizmo_transform()
+	_interaction.process_frame(_delta)
 
 func _input(event: InputEvent) -> void:
-	if not _placement_active or _preview_item == null or event == null:
-		return
-
-	if event is InputEventMouseButton:
-		var mouse_button := event as InputEventMouseButton
-		if mouse_button.button_index != MOUSE_BUTTON_LEFT:
-			return
-
-		if mouse_button.pressed:
-			if _is_pointer_over_placement_ui():
-				return
-
-			var target := _pick_interaction_target(mouse_button.position)
-			match target:
-				"move", "axis_x", "axis_z", "rotate":
-					_begin_drag(target, mouse_button.position)
-					get_viewport().set_input_as_handled()
-			return
-
-		if _drag_mode != "":
-			_end_drag()
-			get_viewport().set_input_as_handled()
-		return
-
-	if event is InputEventMouseMotion and _drag_mode != "":
-		var mouse_motion := event as InputEventMouseMotion
-		_update_drag(mouse_motion.position)
-		get_viewport().set_input_as_handled()
+	_interaction.handle_input(event)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event == null:
-		return
-
-	if event is InputEventKey and event.pressed and not event.echo:
-		var global_key_event := event as InputEventKey
-		if _handle_runtime_shortcuts(global_key_event):
-			get_viewport().set_input_as_handled()
-			return
-
-	if event is InputEventMouseButton:
-		var mouse_button := event as InputEventMouseButton
-		if _is_edit_mode() and not _placement_active and mouse_button.button_index == MOUSE_BUTTON_LEFT and mouse_button.pressed and mouse_button.double_click:
-			if _is_pointer_over_placement_ui():
-				return
-
-			var picked_item := _pick_placeable_item(mouse_button.position)
-			if picked_item != null:
-				_begin_edit_session(picked_item)
-				get_viewport().set_input_as_handled()
-			return
-
-	if not _placement_active:
-		if event is InputEventKey and event.pressed and not event.echo:
-			var idle_key_event := event as InputEventKey
-			if idle_key_event.keycode == KEY_ESCAPE and _browser_open:
-				_set_browser_open(false)
-				get_viewport().set_input_as_handled()
-		return
-
-	if event is InputEventKey and event.pressed and not event.echo:
-		var key_event := event as InputEventKey
-		match key_event.keycode:
-			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
-				_on_confirm_button_pressed()
-				get_viewport().set_input_as_handled()
-			KEY_Q:
-				if _can_rotate_preview():
-					_rotate_preview(-1)
-					get_viewport().set_input_as_handled()
-			KEY_E, KEY_R:
-				if _can_rotate_preview():
-					_rotate_preview(1)
-					get_viewport().set_input_as_handled()
-			KEY_ESCAPE:
-				_cancel_current_placement()
-				get_viewport().set_input_as_handled()
+	_interaction.handle_unhandled_input(event)
 
 func _handle_runtime_shortcuts(key_event: InputEventKey) -> bool:
 	if key_event == null:
@@ -305,38 +269,7 @@ func _handle_runtime_shortcuts(key_event: InputEventKey) -> bool:
 			return false
 
 func blocks_room_camera_input(event: InputEvent) -> bool:
-	if event == null or _debug_world_active:
-		return false
-
-	if event is InputEventMouseButton:
-		var mouse_button := event as InputEventMouseButton
-		if _is_pointer_over_placement_ui():
-			match mouse_button.button_index:
-				MOUSE_BUTTON_LEFT, MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT:
-					return true
-
-	if _placement_active:
-		if _drag_mode != "":
-			if event is InputEventMouseButton:
-				var drag_mouse_button := event as InputEventMouseButton
-				return drag_mouse_button.button_index == MOUSE_BUTTON_LEFT
-			return event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-
-		if event is InputEventMouseButton:
-			var mouse_button := event as InputEventMouseButton
-			return mouse_button.button_index == MOUSE_BUTTON_LEFT \
-				and mouse_button.pressed \
-				and _has_camera_conflicting_placement_target(mouse_button.position)
-		return false
-
-	if _is_edit_mode() and not _placement_active and event is InputEventMouseButton:
-		var mouse_button := event as InputEventMouseButton
-		return mouse_button.button_index == MOUSE_BUTTON_LEFT \
-			and mouse_button.pressed \
-			and mouse_button.double_click \
-			and not _is_pointer_over_placement_ui()
-
-	return false
+	return _interaction.blocks_room_camera_input(event)
 
 func _activate_browser_shortcut(next_editor_mode: String, next_browser_mode: String) -> void:
 	_cancel_current_placement()
@@ -412,286 +345,25 @@ func _build_gizmo() -> void:
 	)
 
 func _build_ui() -> void:
-	_ui_layer = CanvasLayer.new()
-	_ui_layer.name = "PlacementUi"
-	add_child(_ui_layer)
-
-	_ui_root = Control.new()
-	_ui_root.name = "Root"
-	_ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ui_layer.add_child(_ui_root)
-
-	_browser_toggle_button = Button.new()
-	_browser_toggle_button.name = "BuildBrowserToggle"
-	_browser_toggle_button.toggle_mode = true
-	_browser_toggle_button.anchor_left = 0.0
-	_browser_toggle_button.anchor_right = 0.0
-	_browser_toggle_button.offset_left = UI_SIDE_MARGIN
-	_browser_toggle_button.offset_right = UI_SIDE_MARGIN + BROWSER_TOGGLE_BUTTON_SIZE.x
-	_browser_toggle_button.offset_top = 60.0
-	_browser_toggle_button.offset_bottom = 60.0 + BROWSER_TOGGLE_BUTTON_SIZE.y
-	_browser_toggle_button.pressed.connect(_on_browser_toggle_button_pressed)
-	_ui_root.add_child(_browser_toggle_button)
-
-	_inventory_panel = PanelContainer.new()
-	_inventory_panel.name = "InventoryPanel"
-	_inventory_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_ui_root.add_child(_inventory_panel)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
-	_inventory_panel.add_child(margin)
-
-	_browser_layout = VBoxContainer.new()
-	_browser_layout.add_theme_constant_override("separation", 8)
-	margin.add_child(_browser_layout)
-
-	_panel_title_label = Label.new()
-	_panel_title_label.text = "Build Browser"
-	_panel_title_label.add_theme_font_size_override("font_size", 18)
-	PlacementUiStyles.apply_label_color(_panel_title_label, PlacementUiStyles.COLOR_TEXT)
-	_browser_layout.add_child(_panel_title_label)
-
-	_mode_label = null
-
-	var mode_button_row := HBoxContainer.new()
-	mode_button_row.add_theme_constant_override("separation", 6)
-	_browser_layout.add_child(mode_button_row)
-
-	_add_mode_button(mode_button_row, "Build", EDITOR_MODE_BUILD)
-	_add_mode_button(mode_button_row, "Edit", EDITOR_MODE_EDIT)
-
-	var browser_mode_row := HBoxContainer.new()
-	browser_mode_row.add_theme_constant_override("separation", 6)
-	_browser_layout.add_child(browser_mode_row)
-
-	_add_browser_mode_button(browser_mode_row, "Inventory", BROWSER_MODE_INVENTORY)
-	_add_browser_mode_button(browser_mode_row, "Shop", BROWSER_MODE_SHOP)
-
-	var search_row := HBoxContainer.new()
-	search_row.add_theme_constant_override("separation", 6)
-	_browser_layout.add_child(search_row)
-
-	_browser_search_input = LineEdit.new()
-	_browser_search_input.placeholder_text = "Search items..."
-	_browser_search_input.clear_button_enabled = true
-	_browser_search_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_browser_search_input.text_changed.connect(_on_browser_search_text_changed)
-	PlacementUiStyles.apply_line_edit_style(_browser_search_input)
-	search_row.add_child(_browser_search_input)
-
-	var filter_row := HBoxContainer.new()
-	filter_row.add_theme_constant_override("separation", 6)
-	_browser_layout.add_child(filter_row)
-
-	_mount_filter_option = OptionButton.new()
-	_mount_filter_option.custom_minimum_size = Vector2(0.0, 34.0)
-	_mount_filter_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_mount_filter_option.item_selected.connect(_on_mount_filter_option_selected)
-	filter_row.add_child(_mount_filter_option)
-
-	_browser_section_label = Label.new()
-	_browser_section_label.text = "Browse Items"
-	_browser_section_label.add_theme_font_size_override("font_size", 11)
-	PlacementUiStyles.apply_label_color(_browser_section_label, PlacementUiStyles.COLOR_TEXT_MUTED)
-	_browser_layout.add_child(_browser_section_label)
-
-	_category_filter_option = OptionButton.new()
-	_category_filter_option.custom_minimum_size = Vector2(0.0, 34.0)
-	_category_filter_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_category_filter_option.item_selected.connect(_on_category_filter_option_selected)
-	filter_row.add_child(_category_filter_option)
-
-	_browser_scroll = ScrollContainer.new()
-	_browser_scroll.custom_minimum_size = Vector2(0.0, 140.0)
-	_browser_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_browser_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_browser_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
-	_browser_scroll.mouse_force_pass_scroll_events = true
-	var horizontal_scroll_mode: ScrollContainer.ScrollMode = ScrollContainer.SCROLL_MODE_DISABLED
-	var vertical_scroll_mode: ScrollContainer.ScrollMode = ScrollContainer.SCROLL_MODE_AUTO
-	_browser_scroll.horizontal_scroll_mode = horizontal_scroll_mode
-	_browser_scroll.vertical_scroll_mode = vertical_scroll_mode
-	_browser_scroll.gui_input.connect(_on_browser_scroll_gui_input)
-	_browser_layout.add_child(_browser_scroll)
-
-	_browser_grid = GridContainer.new()
-	_browser_grid.columns = 2
-	_browser_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_browser_grid.add_theme_constant_override("h_separation", BROWSER_GRID_H_SEPARATION)
-	_browser_grid.add_theme_constant_override("v_separation", 12)
-	_browser_scroll.add_child(_browser_grid)
-	var browser_scroll_bar := _browser_scroll.get_v_scroll_bar()
-	if browser_scroll_bar != null:
-		browser_scroll_bar.custom_minimum_size = Vector2(8.0, 0.0)
-		browser_scroll_bar.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	_status_shell = PanelContainer.new()
-	PlacementUiStyles.apply_panel_style(_status_shell, PlacementUiStyles.COLOR_PANEL_SOFT, PlacementUiStyles.COLOR_BORDER_SOFT, 1, 14, 4, 0.12)
-	_status_shell.visible = false
-	_browser_layout.add_child(_status_shell)
-
-	var status_margin := MarginContainer.new()
-	status_margin.add_theme_constant_override("margin_left", 10)
-	status_margin.add_theme_constant_override("margin_top", 8)
-	status_margin.add_theme_constant_override("margin_right", 10)
-	status_margin.add_theme_constant_override("margin_bottom", 8)
-	_status_shell.add_child(status_margin)
-
-	_status_label = Label.new()
-	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status_label.custom_minimum_size = Vector2(0.0, 40.0)
-	_status_label.add_theme_font_size_override("font_size", 10)
-	PlacementUiStyles.apply_label_color(_status_label, PlacementUiStyles.COLOR_TEXT_MUTED)
-	status_margin.add_child(_status_label)
-
-	_tools_toggle_button = Button.new()
-	_tools_toggle_button.toggle_mode = true
-	_tools_toggle_button.text = "More Tools"
-	_tools_toggle_button.pressed.connect(_on_tools_toggle_pressed)
-	_browser_layout.add_child(_tools_toggle_button)
-
-	_tools_section = VBoxContainer.new()
-	_tools_section.visible = false
-	_tools_section.add_theme_constant_override("separation", 8)
-	_browser_layout.add_child(_tools_section)
-
-	_floor_style_label = Label.new()
-	_floor_style_label.text = "Floor Finish"
-	_floor_style_label.add_theme_font_size_override("font_size", 11)
-	PlacementUiStyles.apply_label_color(_floor_style_label, PlacementUiStyles.COLOR_TEXT_MUTED)
-	_tools_section.add_child(_floor_style_label)
-
-	var floor_button_row := HBoxContainer.new()
-	floor_button_row.add_theme_constant_override("separation", 8)
-	_tools_section.add_child(floor_button_row)
-
-	_add_floor_style_button(floor_button_row, "Brown Mat", FLOOR_STYLE_COZY_BROWN)
-	_add_floor_style_button(floor_button_row, "Checkerboard", FLOOR_STYLE_CHECKERBOARD)
-
-	_grid_toggle_button = Button.new()
-	_grid_toggle_button.custom_minimum_size = Vector2(0.0, 36.0)
-	_grid_toggle_button.pressed.connect(_on_grid_toggle_button_pressed)
-	_tools_section.add_child(_grid_toggle_button)
-
-	_rotation_toggle_button = Button.new()
-	_rotation_toggle_button.custom_minimum_size = Vector2(0.0, 36.0)
-	_rotation_toggle_button.pressed.connect(_on_rotation_toggle_button_pressed)
-	_tools_section.add_child(_rotation_toggle_button)
-
-	var persistence_row := HBoxContainer.new()
-	persistence_row.add_theme_constant_override("separation", 8)
-	_tools_section.add_child(persistence_row)
-
-	_save_button = Button.new()
-	_save_button.text = "Save"
-	_save_button.custom_minimum_size = Vector2(80.0, 34.0)
-	_save_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_save_button.pressed.connect(_on_save_button_pressed)
-	persistence_row.add_child(_save_button)
-
-	_load_button = Button.new()
-	_load_button.text = "Load"
-	_load_button.custom_minimum_size = Vector2(80.0, 34.0)
-	_load_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_load_button.pressed.connect(_on_load_button_pressed)
-	persistence_row.add_child(_load_button)
-
-	_clear_room_button = Button.new()
-	_clear_room_button.text = "Clear Room"
-	_clear_room_button.custom_minimum_size = Vector2(96.0, 34.0)
-	_clear_room_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_clear_room_button.pressed.connect(_on_clear_room_button_pressed)
-	persistence_row.add_child(_clear_room_button)
-
-	_popup_panel = PanelContainer.new()
-	_popup_panel.name = "PlacementPopup"
-	_popup_panel.visible = false
-	_popup_panel.custom_minimum_size = Vector2(156.0, 82.0)
-	_popup_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_ui_root.add_child(_popup_panel)
-
-	var popup_margin := MarginContainer.new()
-	popup_margin.add_theme_constant_override("margin_left", 8)
-	popup_margin.add_theme_constant_override("margin_top", 8)
-	popup_margin.add_theme_constant_override("margin_right", 8)
-	popup_margin.add_theme_constant_override("margin_bottom", 8)
-	_popup_panel.add_child(popup_margin)
-
-	var popup_layout := VBoxContainer.new()
-	popup_layout.add_theme_constant_override("separation", 6)
-	popup_margin.add_child(popup_layout)
-
-	_popup_status_label = Label.new()
-	_popup_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_popup_status_label.add_theme_font_size_override("font_size", 13)
-	popup_layout.add_child(_popup_status_label)
-
-	var popup_row := HBoxContainer.new()
-	popup_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	popup_row.add_theme_constant_override("separation", 6)
-	popup_margin.add_child(popup_row)
-
-	_confirm_button = Button.new()
-	_confirm_button.tooltip_text = "Place chair"
-	_confirm_button.text = "Place"
-	_confirm_button.custom_minimum_size = Vector2(46.0, 30.0)
-	_confirm_button.custom_minimum_size = Vector2(68.0, 32.0)
-	_confirm_button.add_theme_font_size_override("font_size", 14)
-	_confirm_button.pressed.connect(_on_confirm_button_pressed)
-	popup_row.add_child(_confirm_button)
-
-	_cancel_button = Button.new()
-	_cancel_button.text = "X"
-	_cancel_button.tooltip_text = "Cancel placement"
-	_cancel_button.custom_minimum_size = Vector2(46.0, 30.0)
-	_cancel_button.custom_minimum_size = Vector2(62.0, 32.0)
-	_cancel_button.add_theme_font_size_override("font_size", 14)
-	_cancel_button.pressed.connect(_on_cancel_button_pressed)
-	popup_row.add_child(_cancel_button)
-
-	popup_row.reparent(popup_layout)
-
-	_popup_edit_row = HBoxContainer.new()
-	_popup_edit_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_popup_edit_row.add_theme_constant_override("separation", 6)
-	popup_layout.add_child(_popup_edit_row)
-
-	_duplicate_button = Button.new()
-	_duplicate_button.text = "Duplicate"
-	_duplicate_button.custom_minimum_size = Vector2(86.0, 32.0)
-	_duplicate_button.add_theme_font_size_override("font_size", 14)
-	_duplicate_button.pressed.connect(_on_duplicate_button_pressed)
-	_popup_edit_row.add_child(_duplicate_button)
-
-	_delete_button = Button.new()
-	_delete_button.text = "Delete"
-	_delete_button.custom_minimum_size = Vector2(72.0, 32.0)
-	_delete_button.add_theme_font_size_override("font_size", 14)
-	_delete_button.pressed.connect(_on_delete_button_pressed)
-	_popup_edit_row.add_child(_delete_button)
-
-	_popup_hint_label = Label.new()
-	_popup_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_popup_hint_label.add_theme_font_size_override("font_size", 11)
-	popup_layout.add_child(_popup_hint_label)
-
-	if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
-		get_viewport().size_changed.connect(_on_viewport_size_changed)
-
-	_rebuild_shop_category_tabs()
-	_rebuild_item_browser()
-	_update_mode_ui()
-	_update_browser_mode_ui()
-	_update_browser_toggle_button_visual()
-	_update_popup_visuals()
-	_update_floor_style_ui()
-	_update_browser_layout_metrics(false)
-	_set_browser_open(false, false)
+	if _browser_ui == null:
+		_browser_ui = PlacementBrowserUiControllerScript.new()
+		_browser_ui.placement_manager = self
+		_browser_ui.inventory_item_pressed.connect(_on_inventory_item_button_pressed)
+		_browser_ui.shop_buy_requested.connect(_on_shop_buy_requested)
+		_browser_ui.browser_mode_pressed.connect(_on_browser_mode_button_pressed)
+		_browser_ui.mode_pressed.connect(_on_mode_button_pressed)
+		_browser_ui.grid_toggle_pressed.connect(_set_grid_placement_enabled)
+		_browser_ui.rotation_toggle_pressed.connect(_set_rotation_snap_enabled)
+		_browser_ui.floor_style_pressed.connect(_on_floor_style_button_pressed)
+		_browser_ui.save_pressed.connect(_on_save_button_pressed)
+		_browser_ui.load_pressed.connect(_on_load_button_pressed)
+		_browser_ui.clear_room_pressed.connect(_on_clear_room_button_pressed)
+		_browser_ui.confirm_pressed.connect(_on_confirm_button_pressed)
+		_browser_ui.cancel_pressed.connect(_on_cancel_button_pressed)
+		_browser_ui.duplicate_pressed.connect(_on_duplicate_button_pressed)
+		_browser_ui.delete_pressed.connect(_on_delete_button_pressed)
+		add_child(_browser_ui)
+	_browser_ui.build_ui()
 
 func _add_mode_button(parent: HBoxContainer, title_text: String, mode_id: String) -> void:
 	var button := Button.new()
@@ -754,7 +426,8 @@ func _select_option_button_value(option_button: OptionButton, metadata_value: St
 		option_button.select(0)
 
 func _on_viewport_size_changed() -> void:
-	_update_browser_layout_metrics(false)
+	if _browser_ui != null:
+		_browser_ui.update_browser_layout_metrics(false)
 
 func _on_browser_toggle_button_pressed() -> void:
 	_set_browser_open(_browser_toggle_button.button_pressed)
@@ -813,180 +486,45 @@ func _on_browser_scroll_gui_input(event: InputEvent) -> void:
 				_browser_scroll.accept_event()
 
 func _set_browser_open(is_open: bool, animate: bool = true) -> void:
-	_browser_open = is_open
-	_update_browser_toggle_button_visual()
-	if _inventory_panel == null:
-		return
-
-	var top_margin := _get_browser_top_margin(get_viewport().get_visible_rect().size)
-	var target_position := Vector2(UI_SIDE_MARGIN, top_margin + BROWSER_TOGGLE_BUTTON_SIZE.y + BROWSER_PANEL_TOP_GAP)
-	if not _browser_open:
-		target_position.x = -_inventory_panel.size.x - 24.0
-
-	if _browser_panel_tween != null and _browser_panel_tween.is_running():
-		_browser_panel_tween.kill()
-
-	if not animate:
-		_inventory_panel.position = target_position
-		_inventory_panel.modulate = Color(1.0, 1.0, 1.0, 1.0 if _browser_open else 0.0)
-		if _browser_open:
-			_queue_browser_layout_refresh()
-		return
-
-	_browser_panel_tween = create_tween()
-	_browser_panel_tween.set_trans(Tween.TRANS_QUAD)
-	_browser_panel_tween.set_ease(Tween.EASE_OUT)
-	_browser_panel_tween.parallel().tween_property(_inventory_panel, "position", target_position, BROWSER_ANIMATION_DURATION)
-	_browser_panel_tween.parallel().tween_property(_inventory_panel, "modulate", Color(1.0, 1.0, 1.0, 1.0 if _browser_open else 0.0), BROWSER_ANIMATION_DURATION * 0.9)
-	if _browser_open:
-		_browser_panel_tween.finished.connect(_queue_browser_layout_refresh, CONNECT_ONE_SHOT)
+	if _browser_ui != null:
+		_browser_ui.set_browser_open(is_open, animate)
 
 func _get_browser_top_margin(viewport_size: Vector2) -> float:
 	return clampf(viewport_size.y * 0.09, 56.0, 72.0)
 
 func _update_browser_layout_metrics(animate: bool = false) -> void:
-	if _inventory_panel == null or _browser_toggle_button == null or _ui_root == null:
-		return
-
-	var viewport_size := get_viewport().get_visible_rect().size
-	var top_margin := _get_browser_top_margin(viewport_size)
-	_browser_toggle_button.offset_left = UI_SIDE_MARGIN
-	_browser_toggle_button.offset_right = UI_SIDE_MARGIN + BROWSER_TOGGLE_BUTTON_SIZE.x
-	_browser_toggle_button.offset_top = top_margin
-	_browser_toggle_button.offset_bottom = top_margin + BROWSER_TOGGLE_BUTTON_SIZE.y
-	var available_width := maxf(252.0, viewport_size.x - (UI_SIDE_MARGIN * 2.0) - 24.0)
-	var panel_width := minf(clampf(viewport_size.x * 0.29, BROWSER_PANEL_WIDTH_MIN, BROWSER_PANEL_WIDTH_MAX), available_width)
-	var available_height := maxf(260.0, viewport_size.y - top_margin - BROWSER_TOGGLE_BUTTON_SIZE.y - 22.0)
-	var panel_height := minf(maxf(viewport_size.y * BROWSER_PANEL_HEIGHT_RATIO, BROWSER_PANEL_HEIGHT_MIN), available_height)
-	_inventory_panel.custom_minimum_size = Vector2(panel_width, panel_height)
-	_inventory_panel.size = Vector2(panel_width, panel_height)
-	if _browser_scroll != null:
-		_browser_scroll.custom_minimum_size = Vector2(0.0, clampf(panel_height * 0.34, 120.0, 220.0))
-	var browser_content_width := panel_width - 24.0
-	var two_column_width := (BROWSER_CARD_MIN_WIDTH * 2.0) + BROWSER_GRID_H_SEPARATION + 8.0
-	var panel_position := Vector2(UI_SIDE_MARGIN, top_margin + BROWSER_TOGGLE_BUTTON_SIZE.y + BROWSER_PANEL_TOP_GAP)
-	if not _browser_open:
-		panel_position.x = -panel_width - 24.0
-	_inventory_panel.position = panel_position
-	_browser_grid.columns = 2 if browser_content_width >= two_column_width else 1
-	if animate:
-		_set_browser_open(_browser_open, true)
+	if _browser_ui != null:
+		_browser_ui.update_browser_layout_metrics(animate)
 
 func _queue_browser_layout_refresh() -> void:
-	call_deferred("_refresh_browser_layout")
+	if _browser_ui != null:
+		_browser_ui.queue_browser_layout_refresh()
 
 func _refresh_browser_layout() -> void:
-	if _inventory_panel == null or _browser_layout == null or _browser_scroll == null or _browser_grid == null:
-		return
-
-	_browser_grid.queue_sort()
-	_browser_grid.update_minimum_size()
-	_browser_scroll.update_minimum_size()
-	_browser_layout.queue_sort()
-	_browser_layout.update_minimum_size()
-	_inventory_panel.update_minimum_size()
-	_update_browser_layout_metrics(false)
-	var browser_scroll_bar := _browser_scroll.get_v_scroll_bar()
-	if browser_scroll_bar != null:
-		browser_scroll_bar.update_minimum_size()
+	if _browser_ui != null:
+		_browser_ui.refresh_browser_layout()
 
 func _update_browser_toggle_button_visual() -> void:
-	if _browser_toggle_button == null:
-		return
-	_browser_toggle_button.button_pressed = _browser_open
-	_browser_toggle_button.text = "Hide Build Browser" if _browser_open else "Open Build Browser"
-	_browser_toggle_button.tooltip_text = "Show or hide the build browser"
-	PlacementUiStyles.apply_button_style(
-		_browser_toggle_button,
-		PlacementUiStyles.COLOR_ACCENT_DARK if not _browser_open else PlacementUiStyles.COLOR_ACCENT,
-		PlacementUiStyles.COLOR_BORDER if not _browser_open else PlacementUiStyles.COLOR_ACCENT_BRIGHT,
-		PlacementUiStyles.COLOR_TEXT
-	)
+	if _browser_ui != null:
+		_browser_ui.update_browser_toggle_button_visual()
 
 func _update_section_toggle_ui() -> void:
-	if _tools_toggle_button != null:
-		_tools_toggle_button.text = "More Tools %s" % ("[-]" if _tools_toggle_button.button_pressed else "[+]")
-		PlacementUiStyles.apply_button_style(
-			_tools_toggle_button,
-			PlacementUiStyles.COLOR_PANEL_ALT if _tools_toggle_button.button_pressed else PlacementUiStyles.COLOR_PANEL_SOFT,
-			PlacementUiStyles.COLOR_BORDER_STRONG if _tools_toggle_button.button_pressed else PlacementUiStyles.COLOR_BORDER_SOFT,
-			PlacementUiStyles.COLOR_TEXT
-		)
+	if _browser_ui != null:
+		_browser_ui.update_section_toggle_ui()
 
 func _get_selected_browser_category() -> String:
-	return _selected_shop_category if _browser_mode == BROWSER_MODE_SHOP else _selected_inventory_category
+	return _browser_ui.get_selected_browser_category() if _browser_ui != null else (_selected_shop_category if _browser_mode == BROWSER_MODE_SHOP else _selected_inventory_category)
 
 func _rebuild_shop_category_tabs() -> void:
-	_rebuild_filter_options()
+	if _browser_ui != null:
+		_browser_ui.rebuild_shop_category_tabs()
 
 func _rebuild_item_browser() -> void:
-	if _browser_grid == null:
-		return
-
-	for child in _browser_grid.get_children():
-		_browser_grid.remove_child(child)
-		child.queue_free()
-
-	var visible_item_defs := _get_visible_browser_item_defs()
-	if visible_item_defs.is_empty():
-		var empty_state := PanelContainer.new()
-		PlacementUiStyles.apply_panel_style(empty_state, PlacementUiStyles.COLOR_PANEL_SOFT, PlacementUiStyles.COLOR_BORDER_SOFT, 1, 14, 4, 0.12)
-		empty_state.custom_minimum_size = Vector2(0.0, 108.0)
-		_browser_grid.add_child(empty_state)
-
-		var empty_margin := MarginContainer.new()
-		empty_margin.add_theme_constant_override("margin_left", 12)
-		empty_margin.add_theme_constant_override("margin_top", 12)
-		empty_margin.add_theme_constant_override("margin_right", 12)
-		empty_margin.add_theme_constant_override("margin_bottom", 12)
-		empty_state.add_child(empty_margin)
-
-		var empty_label := Label.new()
-		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		empty_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		empty_label.text = "No items match the current search or filters."
-		PlacementUiStyles.apply_label_color(empty_label, PlacementUiStyles.COLOR_TEXT_MUTED)
-		empty_margin.add_child(empty_label)
-		return
-
-	var item_factory := Callable(self, "_create_item_instance_from_definition")
-	for item_def in visible_item_defs:
-		var item_id := String(item_def.get("id", ""))
-		var card := PlacementBrowserCard.new()
-		card.configure(
-			item_def,
-			_browser_mode,
-			int(_item_stock.get(item_id, 0)),
-			int(_item_owned_totals.get(item_id, 0)),
-			item_factory
-		)
-		card.place_requested.connect(_on_inventory_item_button_pressed)
-		card.buy_requested.connect(_on_shop_buy_requested)
-		_browser_grid.add_child(card)
+	if _browser_ui != null:
+		_browser_ui.rebuild_item_browser()
 
 func _get_visible_browser_item_defs() -> Array[Dictionary]:
-	var visible_items: Array[Dictionary] = []
-	var selected_category := _get_selected_browser_category()
-	var search_filter := _browser_search_text.to_lower()
-	for item_def in _inventory_item_defs:
-		var item_id := String(item_def.get("id", ""))
-		if _browser_mode == BROWSER_MODE_INVENTORY:
-			if int(_item_owned_totals.get(item_id, 0)) <= 0:
-				continue
-
-		if not selected_category.is_empty() and String(item_def.get("category", "")) != selected_category:
-			continue
-		if not _selected_mount_filter.is_empty() and PlacementInventoryCatalog.get_primary_mount_kind(item_def) != _selected_mount_filter:
-			continue
-		if not search_filter.is_empty():
-			var display_name := String(item_def.get("display_name", item_id)).to_lower()
-			var category_name := String(item_def.get("category", "")).to_lower()
-			var badge_text := PlacementInventoryCatalog.get_mount_badge_text(item_def).to_lower()
-			if not display_name.contains(search_filter) and not category_name.contains(search_filter) and not badge_text.contains(search_filter):
-				continue
-		visible_items.append(item_def)
-	return visible_items
+	return _browser_ui.get_visible_browser_item_defs() if _browser_ui != null else []
 
 func _add_floor_style_button(parent: HBoxContainer, title_text: String, style_id: int) -> void:
 	var button := Button.new()
@@ -1059,224 +597,46 @@ func _get_current_floor_style() -> int:
 	return FLOOR_STYLE_COZY_BROWN
 
 func _save_room_layout() -> bool:
-	var layout := PlacementRoomLayoutStore.serialize_layout(
-		_placed_items_root,
-		Callable(self, "_resolve_item_id_for_placeable"),
-		Callable(self, "_get_placeable_instance_id"),
-		_get_current_floor_style(),
-		_item_owned_totals
-	)
-	return PlacementRoomLayoutStore.save_layout(layout)
+	return _layout_persistence.save_layout()
 
 func _load_room_layout_data() -> Dictionary:
-	return PlacementRoomLayoutStore.load_layout_data()
+	return _layout_persistence.load_layout_data()
 
 func _build_default_owned_stock() -> Dictionary:
-	var defaults: Dictionary = {}
-	for item_def in _inventory_item_defs:
-		var item_id := String(item_def.get("id", ""))
-		defaults[item_id] = PlacementInventoryCatalog.get_initial_owned(item_def)
-	return defaults
+	return _layout_persistence.build_default_owned_stock()
 
 func _build_owned_stock_from_layout(layout: Dictionary) -> Dictionary:
-	var owned_stock := _build_default_owned_stock()
-	var loaded_owned_stock := PlacementRoomLayoutStore.deserialize_owned_stock(layout.get("owned_stock", {}))
-	for item_id in loaded_owned_stock.keys():
-		owned_stock[String(item_id)] = int(loaded_owned_stock[item_id])
-
-	var raw_items: Variant = layout.get("items", [])
-	if raw_items is Array:
-		var placed_counts: Dictionary = {}
-		for raw_item in raw_items:
-			if typeof(raw_item) != TYPE_DICTIONARY:
-				continue
-			var item_entry := raw_item as Dictionary
-			var item_id := String(item_entry.get("item_id", ""))
-			if item_id.is_empty():
-				continue
-			placed_counts[item_id] = int(placed_counts.get(item_id, 0)) + 1
-		for item_id in placed_counts.keys():
-			owned_stock[item_id] = maxi(int(owned_stock.get(item_id, 0)), int(placed_counts[item_id]))
-
-	return owned_stock
+	return _layout_persistence.build_owned_stock_from_layout(layout)
 
 func _apply_owned_stock_state(owned_stock: Dictionary) -> void:
-	_item_stock.clear()
-	_item_owned_totals.clear()
-	for item_def in _inventory_item_defs:
-		var item_id := String(item_def.get("id", ""))
-		var owned_total := maxi(0, int(owned_stock.get(item_id, PlacementInventoryCatalog.get_initial_owned(item_def))))
-		_item_owned_totals[item_id] = owned_total
-		_item_stock[item_id] = owned_total
-		_placed_item_counts[item_id] = 0
+	_layout_persistence.apply_owned_stock_state(owned_stock)
 
 func _rebuild_room_from_layout(layout: Dictionary) -> void:
-	_clear_room(false)
-	_apply_owned_stock_state(_build_owned_stock_from_layout(layout))
-
-	if _room_shell != null and _room_shell.has_method("set_floor_style"):
-		_room_shell.call("set_floor_style", int(layout.get("floor_style", FLOOR_STYLE_COZY_BROWN)))
-
-	var raw_items: Variant = layout.get("items", [])
-	if raw_items is Array:
-		var root_items: Array[Dictionary] = []
-		var hosted_items: Array[Dictionary] = []
-		for raw_item in raw_items:
-			if typeof(raw_item) != TYPE_DICTIONARY:
-				continue
-			var item_entry: Dictionary = raw_item
-			var attachment := _build_saved_attachment(item_entry)
-			if String(attachment.get("kind", RoomConstants.ATTACHMENT_ROOM)) == RoomConstants.ATTACHMENT_SUPPORT_SURFACE:
-				hosted_items.append(item_entry)
-			else:
-				root_items.append(item_entry)
-
-		var loaded_instances: Dictionary = {}
-		for item_entry in root_items:
-			var loaded_placeable := _instantiate_saved_item(item_entry, loaded_instances)
-			if loaded_placeable == null:
-				continue
-			loaded_instances[_get_placeable_instance_id(loaded_placeable)] = loaded_placeable
-
-		var pending_hosted := hosted_items.duplicate()
-		var made_progress := true
-		while made_progress and not pending_hosted.is_empty():
-			made_progress = false
-			var next_pending: Array[Dictionary] = []
-			for item_entry in pending_hosted:
-				var loaded_placeable := _instantiate_saved_item(item_entry, loaded_instances)
-				if loaded_placeable == null:
-					next_pending.append(item_entry)
-					continue
-				loaded_instances[_get_placeable_instance_id(loaded_placeable)] = loaded_placeable
-				made_progress = true
-			pending_hosted = next_pending
-
-		if not pending_hosted.is_empty():
-			push_warning("Skipped %d hosted layout item(s) because their host instance was unavailable." % pending_hosted.size())
-
-	_sync_room_wall_openings()
-	_update_floor_style_ui()
-	_update_inventory_ui()
-	_update_status_text()
-	_notify_room_layout_visuals_changed()
+	_layout_persistence.rebuild_room_from_layout(layout)
 
 func _load_room_layout() -> bool:
-	var layout := _load_room_layout_data()
-	if layout.is_empty():
-		return false
-
-	_rebuild_room_from_layout(layout)
-	return true
+	return _layout_persistence.load_layout()
 
 func _load_room_layout_on_startup() -> void:
-	if Engine.is_editor_hint():
-		_refresh_editor_preview_from_saved_layout(true)
-		return
-	_load_room_layout()
+	_layout_persistence.load_layout_on_startup()
 
 func _process_editor_preview(delta: float) -> void:
-	_editor_preview_poll_time -= delta
-	if _editor_preview_poll_time > 0.0:
-		return
-
-	_editor_preview_poll_time = EDITOR_PREVIEW_POLL_SECONDS
-	_refresh_editor_preview_from_saved_layout()
+	_layout_persistence.process_editor_preview(delta)
 
 func _refresh_editor_preview_from_saved_layout(force: bool = false) -> void:
-	var layout_signature := PlacementRoomLayoutStore.get_file_signature()
-	if not force and layout_signature == _editor_preview_layout_signature:
-		return
-
-	_editor_preview_layout_signature = layout_signature
-	if layout_signature.is_empty():
-		_clear_editor_preview_layout()
-		return
-
-	var layout := _load_room_layout_data()
-	if layout.is_empty():
-		_clear_editor_preview_layout()
-		return
-
-	_rebuild_room_from_layout(layout)
+	_layout_persistence.refresh_editor_preview_from_saved_layout(force)
 
 func _clear_editor_preview_layout() -> void:
-	for child in _placed_items_root.get_children():
-		child.free()
-
-	_initialize_inventory_state()
-	if _room_shell != null and _room_shell.has_method("set_floor_style"):
-		_room_shell.call("set_floor_style", _editor_default_floor_style)
-	_wall_openings_signature = ""
-	_sync_room_wall_openings()
+	_layout_persistence.clear_editor_preview_layout()
 
 func _instantiate_saved_item(item_entry: Dictionary, loaded_instances: Dictionary = {}) -> SimpleWoodChair:
-	var item_id := String(item_entry.get("item_id", ""))
-	if item_id.is_empty():
-		return null
-
-	var placeable := _create_item_instance(item_id)
-	if placeable == null:
-		return null
-
-	var attachment := _build_saved_attachment(item_entry)
-	var attachment_kind := String(attachment.get("kind", RoomConstants.ATTACHMENT_ROOM))
-	var rotation_y := float(item_entry.get("rotation_y", 0.0))
-	var instance_id := String(item_entry.get("instance_id", ""))
-
-	var placed_count: int = int(_placed_item_counts.get(item_id, 0)) + 1
-	_placed_item_counts[item_id] = placed_count
-	_ensure_placeable_metadata(placeable, item_id, instance_id)
-	placeable.name = "%s %d" % [_get_item_display_name(item_id), placed_count]
-
-	if attachment_kind == RoomConstants.ATTACHMENT_SUPPORT_SURFACE:
-		var host_instance_id := String(attachment.get("host_instance_id", ""))
-		var host_placeable := loaded_instances.get(host_instance_id, null) as SimpleWoodChair
-		if host_placeable == null:
-			placeable.free()
-			return null
-		host_placeable.add_child(placeable)
-		placeable.position = PlacementRoomLayoutStore.deserialize_vector3(item_entry.get("position", {}))
-		placeable.rotation.y = rotation_y
-		_set_support_attachment_metadata(placeable, host_placeable, String(attachment.get("surface_id", DEFAULT_SUPPORT_SURFACE_ID)))
-	else:
-		var world_position := PlacementRoomLayoutStore.deserialize_vector3(item_entry.get("position", {}))
-		var placement_surface := String(attachment.get("surface", item_entry.get("placement_surface", RoomConstants.FLOOR_SURFACE)))
-		if _is_wall_placeable(placeable) and RoomConstants.is_wall_surface(placement_surface):
-			rotation_y = RoomConstants.get_wall_rotation(placement_surface) + placeable.get_wall_rotation_offset()
-			if _room_shell != null:
-				var horizontal_value := PlacementSurfaceQueries.get_wall_surface_horizontal_value(placement_surface, world_position)
-				world_position = PlacementSurfaceQueries.build_wall_mount_position(_room_shell, placement_surface, horizontal_value, world_position.y, placeable)
-		var placement_transform := Transform3D(Basis.IDENTITY.rotated(Vector3.UP, rotation_y), world_position)
-		_placed_items_root.add_child(placeable)
-		placeable.global_transform = placement_transform
-		_set_room_attachment_metadata(placeable, placement_surface)
-
-	placeable.set_preview_mode(false)
-	_apply_cutaway_to_placeable(placeable)
-	_item_stock[item_id] = maxi(0, int(_item_stock.get(item_id, 0)) - 1)
-	return placeable
+	return _layout_persistence.instantiate_saved_item(item_entry, loaded_instances)
 
 func _autosave_room_layout() -> void:
-	_save_room_layout()
+	_layout_persistence.autosave_room_layout()
 
 func _clear_room(save_after_clear: bool = true) -> void:
-	if _placement_active:
-		_cancel_current_placement()
-
-	for child in _placed_items_root.get_children():
-		child.free()
-
-	for item_id in _item_owned_totals.keys():
-		_item_stock[item_id] = int(_item_owned_totals.get(item_id, 0))
-		_placed_item_counts[item_id] = 0
-	_wall_openings_signature = ""
-	_sync_room_wall_openings()
-	_update_inventory_ui()
-	_update_status_text()
-	_notify_room_layout_visuals_changed()
-	if save_after_clear:
-		_autosave_room_layout()
+	_layout_persistence.clear_room(save_after_clear)
 
 func reload_item_catalog_from_source(refresh_room_from_layout: bool = true) -> void:
 	if _placement_active:
@@ -1299,104 +659,62 @@ func reload_item_catalog_from_source(refresh_room_from_layout: bool = true) -> v
 	_update_floor_style_ui()
 	_notify_room_layout_visuals_changed()
 
+func _invalidate_placeables_registry_structure() -> void:
+	if _placeables_registry != null:
+		_placeables_registry.invalidate_structure()
+	_wall_openings_dirty = true
+
 func _sync_room_wall_openings() -> bool:
-	if _room_shell == null:
+	if not _wall_openings_dirty:
 		return false
+	var preview_item := _preview_item if is_instance_valid(_preview_item) else null
+	var did_change: bool = _wall_opening_sync.sync(_placed_items_root, preview_item, _active_surface_name, _placement_active)
+	_wall_openings_signature = _wall_opening_sync.wall_openings_signature
+	_wall_openings_dirty = false
+	return did_change
 
-	var openings_by_surface: Dictionary = {
-		RoomConstants.WALL_BACK: [],
-		RoomConstants.WALL_LEFT: [],
-		RoomConstants.WALL_FRONT: [],
-		RoomConstants.WALL_RIGHT: [],
-	}
-	for placeable in _get_placeables_under_root():
-		if not placeable.requires_wall_opening():
-			continue
+func _request_wall_openings_refresh() -> void:
+	_wall_openings_dirty = true
 
-		var surface_name := String(placeable.get_meta("placement_surface")) if placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
-		if _placement_active and placeable == _preview_item and _active_preview_is_wall_placeable():
-			surface_name = _active_surface_name
-		_append_wall_opening_for_placeable(openings_by_surface, placeable, surface_name)
+func _on_placeable_structure_committed() -> void:
+	_invalidate_placeables_registry_structure()
+	_sync_room_wall_openings()
+	_notify_room_layout_visuals_changed()
 
-	if _placement_active and _preview_item != null and _preview_item.requires_wall_opening() and _preview_item.get_parent() != _placed_items_root:
-		_append_wall_opening_for_placeable(openings_by_surface, _preview_item, _active_surface_name)
+func _on_placeable_structure_removed() -> void:
+	_invalidate_placeables_registry_structure()
+	_sync_room_wall_openings()
+	_notify_room_layout_visuals_changed()
 
-	var next_signature := _build_wall_openings_signature(openings_by_surface)
-	if next_signature == _wall_openings_signature:
-		return false
-
-	_wall_openings_signature = next_signature
-	if _room_shell.has_method("set_runtime_wall_openings_batch"):
-		_room_shell.call("set_runtime_wall_openings_batch", openings_by_surface)
-		return true
-
-	for surface_name in RoomConstants.WALL_SURFACES:
-		var openings: Array[Dictionary] = []
-		var raw_openings: Variant = openings_by_surface.get(surface_name, [])
-		if raw_openings is Array:
-			for raw_opening in raw_openings:
-				if typeof(raw_opening) != TYPE_DICTIONARY:
-					continue
-				openings.append(raw_opening as Dictionary)
-		_room_shell.set_runtime_wall_openings(surface_name, openings)
-	return true
+func _on_placeable_batch_rebuilt() -> void:
+	_invalidate_placeables_registry_structure()
+	_sync_room_wall_openings()
+	_update_floor_style_ui()
+	_update_inventory_ui()
+	_update_status_text()
+	_notify_room_layout_visuals_changed()
 
 func set_wall_surface_cutaway(surface_name: String, is_cutaway: bool) -> void:
-	if not _wall_surface_cutaway_states.has(surface_name):
-		return
-
-	_wall_surface_cutaway_states[surface_name] = bool(is_cutaway)
-	_apply_cutaway_to_surface(surface_name)
+	_render_state.set_wall_surface_cutaway(surface_name, is_cutaway)
+	_wall_surface_cutaway_states = _render_state.wall_surface_cutaway_states.duplicate()
 
 func set_ceiling_surface_cutaway(is_cutaway: bool) -> void:
-	_ceiling_surface_cutaway = bool(is_cutaway)
-	_apply_cutaway_to_surface(RoomConstants.CEILING_SURFACE)
+	_render_state.set_ceiling_surface_cutaway(is_cutaway)
+	_ceiling_surface_cutaway = _render_state.ceiling_surface_cutaway
 
 func clear_wall_surface_cutaways() -> void:
-	for surface_name in _wall_surface_cutaway_states.keys():
-		_wall_surface_cutaway_states[surface_name] = false
-		_apply_cutaway_to_surface(String(surface_name))
-	_ceiling_surface_cutaway = false
-	_apply_cutaway_to_surface(RoomConstants.CEILING_SURFACE)
+	_render_state.clear_wall_surface_cutaways()
+	_wall_surface_cutaway_states = _render_state.wall_surface_cutaway_states.duplicate()
+	_ceiling_surface_cutaway = _render_state.ceiling_surface_cutaway
 
 func _apply_cutaway_to_surface(_surface_name: String) -> void:
-	if _placed_items_root == null:
-		return
-
-	for placeable in _get_placeables_under_root():
-		if _placement_active and placeable == _preview_item:
-			placeable.set_camera_cutaway(false)
-			continue
-		_apply_cutaway_to_placeable(placeable)
+	_render_state.apply_cutaway_to_surface(_surface_name)
 
 func _apply_cutaway_to_placeable(placeable: SimpleWoodChair) -> void:
-	if placeable == null:
-		return
-
-	placeable.set_camera_cutaway(_is_placeable_effectively_cutaway(placeable))
+	_render_state.apply_cutaway_to_placeable(placeable)
 
 func _append_wall_opening_for_placeable(openings_by_surface: Dictionary, placeable: SimpleWoodChair, surface_name: String) -> void:
-	if placeable == null or not RoomConstants.is_wall_surface(surface_name):
-		return
-
-	var half_extents: Vector2 = placeable.get_wall_opening_half_extents()
-	var center_u: float
-	if surface_name == RoomConstants.WALL_BACK or surface_name == RoomConstants.WALL_FRONT:
-		center_u = placeable.global_position.x - _room_shell.global_position.x
-	else:
-		center_u = placeable.global_position.z - _room_shell.global_position.z
-	var center_v: float = placeable.global_position.y - _room_shell.get_wall_bottom_y()
-
-	var openings := openings_by_surface.get(surface_name, []) as Array
-	openings.append(
-		{
-			"center_u": center_u,
-			"center_v": center_v,
-			"half_u": half_extents.x,
-			"half_v": half_extents.y,
-		}
-	)
-	openings_by_surface[surface_name] = openings
+	_wall_opening_sync.append_wall_opening_for_placeable(openings_by_surface, placeable, surface_name)
 
 func _create_item_instance(item_id: String) -> SimpleWoodChair:
 	var item_def: Dictionary = _get_item_definition(item_id)
@@ -1435,6 +753,9 @@ func _activate_preview_session(preview_item: SimpleWoodChair, item_id: String, s
 	_placement_issue_code = ""
 	_placement_issue_text = ""
 	_popup_visual_signature = ""
+	_last_wall_preview_signature = ""
+	_last_popup_signature = ""
+	_last_gizmo_signature = ""
 	_hover_target = ""
 	_drag_mode = ""
 	_update_mode_ui()
@@ -1561,6 +882,7 @@ func _begin_edit_session(placeable: SimpleWoodChair) -> void:
 		_active_support_surface_id = _editing_original_host_surface_id
 	if _active_preview_is_wall_placeable() and RoomConstants.is_wall_surface(_active_surface_name):
 		_preview_item.rotation.y = RoomConstants.get_wall_rotation(_active_surface_name) + _preview_item.get_wall_rotation_offset()
+	_request_wall_openings_refresh()
 	_sync_room_wall_openings()
 	_refresh_preview_validity()
 
@@ -1584,6 +906,7 @@ func _commit_new_preview_item() -> void:
 		_set_room_attachment_metadata(_preview_item, _active_surface_name)
 	_preview_item.set_preview_mode(false)
 	_apply_cutaway_to_placeable(_preview_item)
+	_on_placeable_structure_committed()
 
 func _commit_edit_preview_item() -> void:
 	if _preview_item == null:
@@ -1602,6 +925,7 @@ func _commit_edit_preview_item() -> void:
 		_set_room_attachment_metadata(_preview_item, _active_surface_name)
 	_preview_item.set_preview_mode(false)
 	_apply_cutaway_to_placeable(_preview_item)
+	_on_placeable_structure_committed()
 
 func _restore_or_discard_active_preview(refund_stock: bool) -> void:
 	if _preview_item == null:
@@ -1624,6 +948,9 @@ func _restore_or_discard_active_preview(refund_stock: bool) -> void:
 		PLACEMENT_SESSION_NEW, PLACEMENT_SESSION_DUPLICATE:
 			if refund_stock and not _active_item_id.is_empty():
 				_item_stock[_active_item_id] = int(_item_stock.get(_active_item_id, 0)) + 1
+			var preview_parent := _preview_item.get_parent()
+			if preview_parent != null:
+				preview_parent.remove_child(_preview_item)
 			_preview_item.queue_free()
 
 func _clear_active_session() -> void:
@@ -1645,6 +972,9 @@ func _clear_active_session() -> void:
 	_editing_original_surface_name = RoomConstants.FLOOR_SURFACE
 	_editing_original_host_surface_id = DEFAULT_SUPPORT_SURFACE_ID
 	_popup_visual_signature = ""
+	_last_wall_preview_signature = ""
+	_last_popup_signature = ""
+	_last_gizmo_signature = ""
 	_popup_panel.visible = false
 	_gizmo_root.visible = false
 	_sync_room_wall_openings()
@@ -1907,10 +1237,8 @@ func _on_confirm_button_pressed() -> void:
 		_:
 			return
 
-	_sync_room_wall_openings()
 	_clear_active_session()
 	_autosave_room_layout()
-	_notify_room_layout_visuals_changed()
 
 func _on_cancel_button_pressed() -> void:
 	_cancel_current_placement()
@@ -1941,6 +1269,7 @@ func _on_duplicate_button_pressed() -> void:
 	_active_support_surface_id = original_support_surface_id
 	if _active_preview_is_support_surface_placeable() and _active_support_host != null:
 		_preview_item.reparent(_active_support_host, true)
+		_invalidate_placeables_registry_structure()
 	_sync_room_wall_openings()
 	_preview_item.rotation.y = seed_rotation
 	_preview_item.global_position = _find_duplicate_seed_position(seed_transform.origin)
@@ -1950,12 +1279,13 @@ func _on_delete_button_pressed() -> void:
 	if not _is_edit_session() or _preview_item == null:
 		return
 
-	_refund_stock_for_placeable_tree(_preview_item)
-	_preview_item.free()
-	_sync_room_wall_openings()
+	var deleted_preview_item := _preview_item
+	_preview_item = null
+	_refund_stock_for_placeable_tree(deleted_preview_item)
+	deleted_preview_item.free()
+	_on_placeable_structure_removed()
 	_clear_active_session()
 	_autosave_room_layout()
-	_notify_room_layout_visuals_changed()
 
 func set_debug_world_active(active: bool) -> void:
 	if _debug_world_active == active:
@@ -1989,6 +1319,8 @@ func _cancel_current_placement() -> void:
 		return
 
 	_restore_or_discard_active_preview(true)
+	_invalidate_placeables_registry_structure()
+	_request_wall_openings_refresh()
 	_clear_active_session()
 
 func _update_preview_from_mouse(use_current_mouse: bool) -> void:
@@ -2066,7 +1398,7 @@ func _get_preview_excluded_rids() -> Array[RID]:
 	var excluded_rids: Array[RID] = []
 	if _preview_item == null:
 		return excluded_rids
-	for placeable in _collect_placeable_tree(_preview_item):
+	for placeable in collect_placeable_subtree(_preview_item):
 		excluded_rids.append(placeable.get_rid())
 	return excluded_rids
 
@@ -2087,120 +1419,16 @@ func _refresh_preview_validity() -> void:
 	_update_status_text()
 
 func _update_inventory_ui() -> void:
-	_update_browser_mode_ui()
-	_rebuild_item_browser()
-	_update_section_toggle_ui()
-	if _browser_search_input != null:
-		_browser_search_input.editable = not _placement_active
-	if _grid_toggle_button != null:
-		_grid_toggle_button.text = "Grid Placement: %s" % ("On" if _grid_placement_enabled else "Off")
-		_grid_toggle_button.disabled = false
-		PlacementUiStyles.apply_button_style(
-			_grid_toggle_button,
-			PlacementUiStyles.COLOR_ACCENT_DARK if _grid_placement_enabled else PlacementUiStyles.COLOR_PANEL_ALT,
-			PlacementUiStyles.COLOR_ACCENT_BRIGHT if _grid_placement_enabled else PlacementUiStyles.COLOR_BORDER,
-			PlacementUiStyles.COLOR_TEXT
-		)
-	if _rotation_toggle_button != null:
-		_rotation_toggle_button.text = "Rotation Snap: %s" % ("On" if _rotation_snap_enabled else "Off")
-		_rotation_toggle_button.disabled = false
-		PlacementUiStyles.apply_button_style(
-			_rotation_toggle_button,
-			PlacementUiStyles.COLOR_ACCENT_DARK if _rotation_snap_enabled else PlacementUiStyles.COLOR_PANEL_ALT,
-			PlacementUiStyles.COLOR_ACCENT_BRIGHT if _rotation_snap_enabled else PlacementUiStyles.COLOR_BORDER,
-			PlacementUiStyles.COLOR_TEXT
-		)
-	if _save_button != null:
-		_save_button.disabled = _placement_active
-		PlacementUiStyles.apply_button_style(
-			_save_button,
-			PlacementUiStyles.COLOR_PANEL_ALT,
-			PlacementUiStyles.COLOR_BORDER,
-			PlacementUiStyles.COLOR_TEXT
-		)
-	if _load_button != null:
-		_load_button.disabled = _placement_active
-		PlacementUiStyles.apply_button_style(
-			_load_button,
-			PlacementUiStyles.COLOR_PANEL_ALT,
-			PlacementUiStyles.COLOR_BORDER,
-			PlacementUiStyles.COLOR_TEXT
-		)
-	if _clear_room_button != null:
-		_clear_room_button.disabled = _placement_active
-		PlacementUiStyles.apply_button_style(
-			_clear_room_button,
-			PlacementUiStyles.COLOR_DANGER,
-			PlacementUiStyles.COLOR_DANGER_BORDER,
-			PlacementUiStyles.COLOR_TEXT
-		)
-	if _browser_section_label != null:
-		var result_count := _get_visible_browser_item_defs().size()
-		var category_name := _get_selected_browser_category()
-		var category_suffix := ": %s" % category_name if not category_name.is_empty() else ""
-		if _browser_mode == BROWSER_MODE_SHOP:
-			_browser_section_label.text = "Shop Catalog%s  |  %d results" % [category_suffix, result_count]
-		else:
-			_browser_section_label.text = "Inventory%s  |  %d results" % [category_suffix, result_count]
-	if _status_shell != null:
-		_status_shell.visible = _placement_active or _is_edit_mode() or not _has_any_stock()
-	if _inventory_panel != null:
-		PlacementUiStyles.apply_panel_style(_inventory_panel, PlacementUiStyles.COLOR_PANEL, PlacementUiStyles.COLOR_BORDER, 1, 18, 10, 0.24)
-	_queue_browser_layout_refresh()
+	if _browser_ui != null:
+		_browser_ui.refresh_inventory_ui()
 
 func _update_mode_ui() -> void:
-	for mode_id in _mode_buttons.keys():
-		var button := _mode_buttons.get(mode_id) as Button
-		if button == null:
-			continue
-
-		var is_selected := String(mode_id) == _editor_mode
-		button.button_pressed = is_selected
-		button.disabled = is_selected or _placement_active
-		PlacementUiStyles.apply_button_style(
-			button,
-			PlacementUiStyles.COLOR_PANEL_ALT if not is_selected else PlacementUiStyles.COLOR_ACCENT,
-			PlacementUiStyles.COLOR_BORDER if not is_selected else PlacementUiStyles.COLOR_ACCENT_BRIGHT,
-			PlacementUiStyles.COLOR_TEXT
-		)
-
-	if _mode_label != null:
-		_mode_label.text = "Mode: %s" % ("Edit" if _is_edit_mode() else "Build")
+	if _browser_ui != null:
+		_browser_ui.update_mode_ui()
 
 func _update_browser_mode_ui() -> void:
-	for mode_id in _browser_mode_buttons.keys():
-		var button := _browser_mode_buttons.get(mode_id) as Button
-		if button == null:
-			continue
-		var is_selected := String(mode_id) == _browser_mode
-		button.button_pressed = is_selected
-		button.disabled = is_selected or _placement_active
-		PlacementUiStyles.apply_button_style(
-			button,
-			PlacementUiStyles.COLOR_PANEL_SOFT if not is_selected else PlacementUiStyles.COLOR_ACCENT_DARK,
-			PlacementUiStyles.COLOR_BORDER if not is_selected else PlacementUiStyles.COLOR_ACCENT_BRIGHT,
-			PlacementUiStyles.COLOR_TEXT
-		)
-
-	if _mount_filter_option != null:
-		_mount_filter_option.disabled = _placement_active
-		PlacementUiStyles.apply_button_style(
-			_mount_filter_option,
-			PlacementUiStyles.COLOR_PANEL_SOFT,
-			PlacementUiStyles.COLOR_BORDER_SOFT,
-			PlacementUiStyles.COLOR_TEXT
-		)
-		_select_option_button_value(_mount_filter_option, _selected_mount_filter)
-
-	if _category_filter_option != null:
-		_category_filter_option.disabled = _placement_active
-		PlacementUiStyles.apply_button_style(
-			_category_filter_option,
-			PlacementUiStyles.COLOR_PANEL_SOFT,
-			PlacementUiStyles.COLOR_BORDER_SOFT,
-			PlacementUiStyles.COLOR_TEXT
-		)
-		_select_option_button_value(_category_filter_option, _get_selected_browser_category())
+	if _browser_ui != null:
+		_browser_ui.update_browser_mode_ui()
 
 func _get_owned_item_type_count() -> int:
 	var count := 0
@@ -2210,27 +1438,8 @@ func _get_owned_item_type_count() -> int:
 	return count
 
 func _update_floor_style_ui() -> void:
-	var current_style := FLOOR_STYLE_COZY_BROWN
-	if _room_shell != null and _room_shell.has_method("get_floor_style"):
-		current_style = int(_room_shell.call("get_floor_style"))
-
-	for style_id in _floor_style_buttons.keys():
-		var button := _floor_style_buttons.get(style_id) as Button
-		if button == null:
-			continue
-
-		var is_selected := int(style_id) == current_style
-		button.button_pressed = is_selected
-		button.disabled = is_selected
-		PlacementUiStyles.apply_button_style(
-			button,
-			PlacementUiStyles.COLOR_PANEL_ALT if not is_selected else PlacementUiStyles.COLOR_ACCENT,
-			PlacementUiStyles.COLOR_BORDER if not is_selected else PlacementUiStyles.COLOR_ACCENT_BRIGHT,
-			PlacementUiStyles.COLOR_TEXT
-		)
-
-	if _floor_style_label != null:
-		_floor_style_label.text = "Floor Finish: %s" % ("Brown Mat" if current_style == FLOOR_STYLE_COZY_BROWN else "Checkerboard")
+	if _browser_ui != null:
+		_browser_ui.update_floor_style_ui()
 
 func _update_status_text() -> void:
 	if _status_label == null:
@@ -2316,12 +1525,16 @@ func _refresh_grid_overlay_transform() -> void:
 	_grid_overlay.global_position = Vector3(_room_shell.global_position.x, overlay_y, _room_shell.global_position.z)
 
 func _update_popup_position() -> void:
-	if _preview_item == null:
+	if _preview_item == null or _popup_panel == null:
 		return
 
 	var camera := _get_active_camera()
 	if camera == null:
 		return
+	var next_signature := _build_popup_signature(camera)
+	if next_signature == _last_popup_signature:
+		return
+	_last_popup_signature = next_signature
 
 	var anchor_world: Vector3 = _preview_item.global_position + Vector3(0.0, _get_popup_anchor_offset_y(), 0.0)
 	if camera.is_position_behind(anchor_world):
@@ -2341,12 +1554,16 @@ func _update_popup_position() -> void:
 	_popup_panel.position = screen_position
 
 func _update_gizmo_transform() -> void:
-	if _preview_item == null:
+	if _preview_item == null or _gizmo_root == null:
 		return
 
+	var camera := _get_active_camera()
+	var next_signature := _build_gizmo_signature(camera)
+	if next_signature == _last_gizmo_signature:
+		return
+	_last_gizmo_signature = next_signature
 	_gizmo_root.global_position = _preview_item.global_position + Vector3(0.0, _get_gizmo_offset_y(), 0.0)
 	_gizmo_root.global_basis = _preview_item.global_transform.basis.orthonormalized()
-	var camera := _get_active_camera()
 	if camera != null:
 		var camera_distance: float = camera.global_position.distance_to(_gizmo_root.global_position)
 		var gizmo_scale: float = clampf(camera_distance * GIZMO_DISTANCE_SCALE, GIZMO_MIN_SCALE, GIZMO_MAX_SCALE)
@@ -2470,7 +1687,11 @@ func _set_preview_position(target_position: Vector3) -> void:
 	if _active_preview_is_wall_placeable():
 		_preview_item.global_position = _resolve_wall_preview_position(target_position)
 		_preview_item.rotation.y = RoomConstants.get_wall_rotation(_active_surface_name) + _preview_item.get_wall_rotation_offset()
-		_sync_room_wall_openings()
+		var next_wall_signature := _build_live_wall_preview_signature()
+		if next_wall_signature != _last_wall_preview_signature:
+			_last_wall_preview_signature = next_wall_signature
+			_request_wall_openings_refresh()
+			_sync_room_wall_openings()
 	elif _active_preview_is_ceiling_placeable():
 		_preview_item.global_position = _resolve_planar_preview_position(target_position, RoomConstants.CEILING_SURFACE)
 	elif _active_preview_is_support_surface_placeable():
@@ -2478,6 +1699,7 @@ func _set_preview_position(target_position: Vector3) -> void:
 		if _active_support_host != null and not support_surface.is_empty():
 			if _preview_item.get_parent() != _active_support_host:
 				_preview_item.reparent(_active_support_host, true)
+				_invalidate_placeables_registry_structure()
 			_preview_item.position = _resolve_support_surface_local_position(_active_support_host, support_surface, target_position)
 	else:
 		_preview_item.global_position = _resolve_planar_preview_position(target_position, RoomConstants.FLOOR_SURFACE)
@@ -2496,6 +1718,7 @@ func _apply_preview_surface_hit(hit: Dictionary) -> void:
 		_active_support_surface_id = surface_id
 		if _preview_item.get_parent() != host:
 			_preview_item.reparent(host, true)
+			_invalidate_placeables_registry_structure()
 		_set_preview_position(hit["position"] as Vector3)
 		return
 	_set_preview_position(hit["position"] as Vector3)
@@ -2515,16 +1738,9 @@ func _get_support_surface_data(host: SimpleWoodChair, surface_id: String) -> Dic
 	return {}
 
 func _get_support_surface_hosts() -> Array[SimpleWoodChair]:
-	var hosts: Array[SimpleWoodChair] = []
-	for placeable in _get_placeables_under_root():
-		if placeable == null or placeable == _preview_item:
-			continue
-		if not placeable.can_host_surface_items():
-			continue
-		if _is_placeable_effectively_cutaway(placeable):
-			continue
-		hosts.append(placeable)
-	return hosts
+	if _placeables_registry == null:
+		return []
+	return _placeables_registry.get_support_surface_hosts(_preview_item, _render_state)
 
 func _resolve_planar_preview_position(target_position: Vector3, surface_name: String) -> Vector3:
 	if _grid_placement_enabled:
@@ -2901,58 +2117,102 @@ func _update_popup_visuals() -> void:
 		PlacementUiStyles.COLOR_TEXT
 	)
 
-func _get_placeables_under_root() -> Array[SimpleWoodChair]:
-	var placeables: Array[SimpleWoodChair] = []
-	if _placed_items_root == null:
-		return placeables
-	_collect_placeables_recursive(_placed_items_root, placeables)
-	return placeables
+func get_wall_opening_placeables_cached() -> Array[SimpleWoodChair]:
+	if _placeables_registry == null:
+		return []
+	return _placeables_registry.get_wall_opening_placeables()
 
-func _collect_placeables_recursive(node: Node, output: Array[SimpleWoodChair]) -> void:
-	for child in node.get_children():
-		var placeable := child as SimpleWoodChair
-		if placeable != null:
-			output.append(placeable)
-			_collect_placeables_recursive(placeable, output)
-			continue
-		_collect_placeables_recursive(child, output)
+func get_window_placeables_cached() -> Array[SimpleWoodChair]:
+	if _placeables_registry == null:
+		return []
+	return _placeables_registry.get_window_placeables()
 
-func _collect_placeable_tree(root_placeable: SimpleWoodChair) -> Array[SimpleWoodChair]:
-	var placeables: Array[SimpleWoodChair] = []
-	if root_placeable == null:
-		return placeables
-	placeables.append(root_placeable)
-	_collect_placeables_recursive(root_placeable, placeables)
-	return placeables
+func get_wall_placeables_for_surface(surface_name: String) -> Array[SimpleWoodChair]:
+	if _placeables_registry == null:
+		return []
+	return _placeables_registry.get_wall_placeables_for_surface(surface_name)
+
+func get_ceiling_placeables() -> Array[SimpleWoodChair]:
+	if _placeables_registry == null:
+		return []
+	return _placeables_registry.get_ceiling_placeables()
+
+func collect_placeable_subtree(root_placeable: SimpleWoodChair) -> Array[SimpleWoodChair]:
+	if _placeables_registry == null:
+		var subtree: Array[SimpleWoodChair] = []
+		if root_placeable != null and is_instance_valid(root_placeable):
+			subtree.append(root_placeable)
+		return subtree
+	return _placeables_registry.collect_placeable_subtree(root_placeable)
+
+func _build_live_wall_preview_signature() -> String:
+	if _preview_item == null:
+		return ""
+
+	var preview_position := _preview_item.global_position
+	var opening := _preview_item.get_wall_opening_half_extents()
+	return "%s|%.3f|%.3f|%.3f|%.3f|%.3f" % [
+		_active_surface_name,
+		preview_position.x,
+		preview_position.y,
+		preview_position.z,
+		opening.x,
+		opening.y,
+	]
+
+func _build_popup_signature(camera: Camera3D) -> String:
+	if _preview_item == null or camera == null or _popup_panel == null:
+		return ""
+
+	var preview_position := _preview_item.global_position
+	var anchor_offset_y := _get_popup_anchor_offset_y()
+	var anchor_world := preview_position + Vector3(0.0, anchor_offset_y, 0.0)
+	var popup_size := _popup_panel.get_combined_minimum_size()
+	var viewport_size := get_viewport().get_visible_rect().size
+	return "%s|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f" % [
+		"1" if not camera.is_position_behind(anchor_world) else "0",
+		preview_position.x,
+		preview_position.y,
+		preview_position.z,
+		anchor_offset_y,
+		camera.global_position.x,
+		camera.global_position.y,
+		camera.global_position.z,
+		viewport_size.x,
+		viewport_size.y,
+		popup_size.x,
+		popup_size.y,
+	]
+
+func _build_gizmo_signature(camera: Camera3D) -> String:
+	if _preview_item == null:
+		return ""
+
+	var preview_position := _preview_item.global_position
+	var rotation_y := _preview_item.rotation.y
+	var camera_position := camera.global_position if camera != null else Vector3.ZERO
+	return "%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f" % [
+		preview_position.x,
+		preview_position.y,
+		preview_position.z,
+		rotation_y,
+		camera_position.x,
+		camera_position.y,
+		camera_position.z,
+	]
 
 func _refund_stock_for_placeable_tree(root_placeable: SimpleWoodChair) -> void:
-	for placeable in _collect_placeable_tree(root_placeable):
+	for placeable in collect_placeable_subtree(root_placeable):
 		var item_id := _resolve_item_id_for_placeable(placeable)
 		if item_id.is_empty():
 			continue
 		_item_stock[item_id] = int(_item_stock.get(item_id, 0)) + 1
 
 func _is_placeable_effectively_cutaway(placeable: SimpleWoodChair) -> bool:
-	var current: Node = placeable
-	while current != null and current != _placed_items_root:
-		var current_placeable := current as SimpleWoodChair
-		if current_placeable != null:
-			if _is_ceiling_placeable(current_placeable) and _ceiling_surface_cutaway:
-				return true
-			if _is_wall_placeable(current_placeable):
-				var placement_surface := String(current_placeable.get_meta("placement_surface")) if current_placeable.has_meta("placement_surface") else RoomConstants.FLOOR_SURFACE
-				if _placement_active and current_placeable == _preview_item and _active_preview_is_wall_placeable():
-					placement_surface = _active_surface_name
-				if bool(_wall_surface_cutaway_states.get(placement_surface, false)):
-					return true
-		current = current.get_parent()
-	return false
+	return _render_state.is_placeable_effectively_cutaway(placeable)
 
 func _build_wall_openings_signature(openings_by_surface: Dictionary) -> String:
-	var normalized: Array = []
-	for surface_name in RoomConstants.WALL_SURFACES:
-		normalized.append(openings_by_surface.get(surface_name, []))
-	return JSON.stringify(normalized)
+	return _wall_opening_sync.build_wall_openings_signature(openings_by_surface)
 
 func _notify_room_layout_visuals_changed() -> void:
 	room_layout_visuals_changed.emit()

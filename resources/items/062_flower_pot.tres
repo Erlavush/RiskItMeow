@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="PlacementCatalogItemResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/placement_catalog_item_resource.gd" id="1_catalog_item"]
+
+[resource]
+script = ExtResource("1_catalog_item")
+id = "flower_pot"
+display_name = "Flower Pot"
+category = "Decor"
+initial_owned = 3
+factory_type = "imported_scene"
+source_scene_path = "res://assets/props/surface_decor/flower_pot/flower_pot.glb"
+mount_kind = "support_surface"
+mount_kinds = Array[String](["support_surface"])
+visual_fit_height = 0.6
+preview_yaw = 0.3141593

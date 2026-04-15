@@ -19,6 +19,7 @@ var _last_wall_cutaways: Dictionary = {
 	RoomConstants.WALL_RIGHT: false,
 }
 var _last_roof_cutaway := false
+var _last_cutaway_token := ""
 
 func _ready() -> void:
 	_room_shell = get_node_or_null(room_shell_path) as RoomShell
@@ -39,8 +40,9 @@ func _apply_cutaway_state(force: bool = false) -> void:
 			_clear_cutaway_state()
 		return
 
+	var camera_mode := ""
 	if _player != null and _player.has_method("get_camera_mode"):
-		var camera_mode := String(_player.call("get_camera_mode"))
+		camera_mode = String(_player.call("get_camera_mode"))
 		if camera_mode == "first_person":
 			_clear_cutaway_state()
 			return
@@ -48,6 +50,10 @@ func _apply_cutaway_state(force: bool = false) -> void:
 	var camera := _get_active_camera()
 	if camera == null:
 		return
+	var next_token := _build_cutaway_token(camera, camera_mode)
+	if not force and next_token == _last_cutaway_token:
+		return
+	_last_cutaway_token = next_token
 
 	var local_camera := _room_shell.to_local(camera.global_position)
 	var next_wall_cutaways := {
@@ -76,6 +82,7 @@ func _apply_cutaway_state(force: bool = false) -> void:
 			_placement_manager.set_ceiling_surface_cutaway(next_roof_cutaway)
 
 func _clear_cutaway_state() -> void:
+	_last_cutaway_token = ""
 	var needs_clear := _last_roof_cutaway
 	for surface_name in RoomConstants.WALL_SURFACES:
 		if bool(_last_wall_cutaways.get(surface_name, false)):
@@ -94,6 +101,18 @@ func _clear_cutaway_state() -> void:
 	_room_shell.set_surface_cutaway(RoomConstants.CEILING_SURFACE, false)
 	if _placement_manager != null:
 		_placement_manager.set_ceiling_surface_cutaway(false)
+
+func _build_cutaway_token(camera: Camera3D, camera_mode: String) -> String:
+	if camera == null:
+		return ""
+
+	var camera_position := camera.global_position
+	return "%s|%.3f|%.3f|%.3f" % [
+		camera_mode,
+		camera_position.x,
+		camera_position.y,
+		camera_position.z,
+	]
 
 func _get_active_camera() -> Camera3D:
 	if _player != null and _player.has_method("get_active_camera"):

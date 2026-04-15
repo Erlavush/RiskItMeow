@@ -16,3 +16,13 @@ export_presets.cfg
 # OS Specific
 .DS_Store
 Thumbs.db
+
+Proxima/
+
+# Local Tooling & Executables
+*.exe
+
+# AI Pipeline Artifacts
+codebase_snapshot.txt
+tmp/
+temporary/

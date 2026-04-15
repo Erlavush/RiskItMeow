@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="PlacementCatalogItemResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/placement_catalog_item_resource.gd" id="1_catalog_item"]
+
+[resource]
+script = ExtResource("1_catalog_item")
+id = "office_desk_computer"
+display_name = "Office Desk + Computer"
+category = "Tables"
+initial_owned = 3
+factory_type = "imported_scene"
+source_scene_path = "res://assets/props/fnaf-minecraft-pizzeria-pack/source/demopack.gltf"
+mount_kind = "floor"
+mount_kinds = Array[String](["floor"])
+source_node_names = Array[String](["OfficeTable", "Conputer"])
+collision_size = Vector3(3, 1.8, 0.94)
+footprint_half_extents = Vector2(1.5, 0.5)
+can_host_surface_items = true
+support_surfaces = [{
+"center_offset": Vector3(0, 1.0625, -0.31),
+"half_extents": Vector2(1.38, 0.24),
+"id": "top"
+}]

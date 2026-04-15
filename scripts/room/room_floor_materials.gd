@@ -3,7 +3,7 @@ extends RefCounted
 
 const FloorCheckerShader := preload("res://shaders/floor_checker.gdshader")
 const FloorCozyBrownShader := preload("res://shaders/floor_cozy_brown.gdshader")
-const FloorCozyBrownTexturePath := "res://assets/textures/floors/dark_brown_linen_floor_32.png"
+const FloorCozyBrownTexture := preload("res://assets/textures/floors/dark_brown_linen_floor_32.png")
 
 static func apply_floor_material(visual: MeshInstance3D, floor_style: int, room_half_extents: Vector2) -> void:
 	if visual == null:
@@ -28,7 +28,7 @@ static func _apply_checker_material(visual: MeshInstance3D) -> void:
 	shader_material.set_shader_parameter("roughness_value", 0.96)
 
 static func _apply_cozy_brown_material(visual: MeshInstance3D, room_half_extents: Vector2) -> void:
-	var floor_texture := load(FloorCozyBrownTexturePath) as Texture2D
+	var floor_texture := FloorCozyBrownTexture
 	if floor_texture == null:
 		return
 

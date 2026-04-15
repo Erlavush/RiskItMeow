@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="PlacementCatalogItemResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/placement_catalog_item_resource.gd" id="1_catalog_item"]
+
+[resource]
+script = ExtResource("1_catalog_item")
+id = "simple_wood_chair"
+display_name = "Simple Wood Chair"
+category = "Chairs"
+initial_owned = 3
+factory_type = "imported_scene"
+source_scene_path = "res://assets/props/simple_wood_chair/scene.gltf"
+mount_kind = "floor"
+mount_kinds = Array[String](["floor"])
+visual_scale = Vector3(0.25, 0.25, 0.25)
+visual_y_offset = 0.275
+collision_size = Vector3(0.9, 1.5, 0.9)

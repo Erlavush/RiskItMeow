@@ -34,14 +34,17 @@ static func configure_wall_surface(
 		openings_by_surface.get(surface_name, [])
 	)
 	var wall_material := _get_or_create_wall_segment_material(surface_name, color, material_cache)
-	for segment_def in segment_defs:
+	for index in range(segment_defs.size()):
+		var segment_def := segment_defs[index]
 		_add_wall_segment(
 			segments_root,
+			index,
 			surface_name,
 			segment_def.get("position", Vector3.ZERO) as Vector3,
 			segment_def.get("size", size) as Vector3,
 			wall_material
 		)
+	_hide_unused_segment_nodes(segments_root, segment_defs.size())
 
 static func set_segments_visible(surface: Node3D, visible_state: bool, is_cutaway: bool, shadows_only: int, shadows_on: int) -> void:
 	var segments_root := surface.get_node_or_null(WALL_SEGMENTS_ROOT_NAME) as Node3D
@@ -52,6 +55,9 @@ static func set_segments_visible(surface: Node3D, visible_state: bool, is_cutawa
 		var segment_root := child as Node3D
 		if segment_root == null:
 			continue
+		if not bool(segment_root.get_meta("wall_segment_active", false)):
+			continue
+		segment_root.visible = visible_state
 
 		var visual := segment_root.get_node_or_null("Visual") as VisualInstance3D
 		if visual != null:
@@ -167,8 +173,85 @@ static func _get_or_create_wall_segments_root(surface: Node3D) -> Node3D:
 	return segments_root
 
 static func _clear_wall_segments(segments_root: Node3D) -> void:
-	for child in segments_root.get_children():
-		child.free()
+	_hide_unused_segment_nodes(segments_root, 0)
+
+static func _hide_unused_segment_nodes(segments_root: Node3D, used_count: int) -> void:
+	if segments_root == null:
+		return
+
+	for index in range(segments_root.get_child_count()):
+		var segment_root := segments_root.get_child(index) as Node3D
+		if segment_root == null:
+			continue
+
+		var is_used := index < used_count
+		segment_root.set_meta("wall_segment_active", is_used)
+		if is_used:
+			continue
+
+		segment_root.visible = false
+		var visual := segment_root.get_node_or_null("Visual") as VisualInstance3D
+		if visual != null:
+			visual.visible = false
+		var collider_body := segment_root.get_node_or_null("Collider") as CollisionObject3D
+		if collider_body != null:
+			collider_body.disable_mode = CollisionObject3D.DISABLE_MODE_REMOVE
+			collider_body.process_mode = Node.PROCESS_MODE_DISABLED
+
+static func _ensure_segment_node(segments_root: Node3D, index: int) -> Node3D:
+	if segments_root == null:
+		return null
+
+	if index < segments_root.get_child_count():
+		var existing := segments_root.get_child(index) as Node3D
+		if existing != null:
+			return existing
+
+	var segment_root := Node3D.new()
+	segment_root.name = "Segment_%d" % index
+	segments_root.add_child(segment_root)
+	return segment_root
+
+static func _apply_segment_node(segment_root: Node3D, surface_name: String, local_position: Vector3, size: Vector3, material: StandardMaterial3D) -> void:
+	if segment_root == null:
+		return
+
+	segment_root.position = local_position
+	segment_root.visible = true
+	segment_root.set_meta("wall_segment_active", true)
+
+	var visual := segment_root.get_node_or_null("Visual") as MeshInstance3D
+	if visual == null:
+		visual = MeshInstance3D.new()
+		visual.name = "Visual"
+		segment_root.add_child(visual)
+	var mesh := visual.mesh as BoxMesh
+	if mesh == null:
+		mesh = BoxMesh.new()
+		visual.mesh = mesh
+	mesh.size = size
+	visual.material_override = material
+	visual.visible = true
+
+	var collider := segment_root.get_node_or_null("Collider") as StaticBody3D
+	if collider == null:
+		collider = StaticBody3D.new()
+		collider.name = "Collider"
+		segment_root.add_child(collider)
+	collider.set_meta("surface_name", surface_name)
+	collider.disable_mode = CollisionObject3D.DISABLE_MODE_REMOVE
+	collider.process_mode = Node.PROCESS_MODE_INHERIT
+
+	var collision_shape := collider.get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if collision_shape == null:
+		collision_shape = CollisionShape3D.new()
+		collision_shape.name = "CollisionShape3D"
+		collider.add_child(collision_shape)
+	var box_shape := collision_shape.shape as BoxShape3D
+	if box_shape == null:
+		box_shape = BoxShape3D.new()
+		collision_shape.shape = box_shape
+	box_shape.size = size
 
 static func _get_or_create_wall_segment_material(surface_name: String, color: Color, material_cache: Dictionary) -> StandardMaterial3D:
 	if material_cache.has(surface_name):
@@ -184,28 +267,6 @@ static func _get_or_create_wall_segment_material(surface_name: String, color: Co
 	material_cache[surface_name] = material
 	return material
 
-static func _add_wall_segment(segments_root: Node3D, surface_name: String, local_position: Vector3, size: Vector3, material: StandardMaterial3D) -> void:
-	var segment_root := Node3D.new()
-	segment_root.position = local_position
-	segments_root.add_child(segment_root)
-
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.name = "Visual"
-	var box_mesh := BoxMesh.new()
-	box_mesh.size = size
-	mesh_instance.mesh = box_mesh
-	mesh_instance.material_override = material
-	segment_root.add_child(mesh_instance)
-
-	var collider_body := StaticBody3D.new()
-	collider_body.name = "Collider"
-	collider_body.set_meta("surface_name", surface_name)
-	collider_body.disable_mode = CollisionObject3D.DISABLE_MODE_REMOVE
-	collider_body.process_mode = Node.PROCESS_MODE_INHERIT
-	segment_root.add_child(collider_body)
-
-	var collision_shape := CollisionShape3D.new()
-	var box_shape := BoxShape3D.new()
-	box_shape.size = size
-	collision_shape.shape = box_shape
-	collider_body.add_child(collision_shape)
+static func _add_wall_segment(segments_root: Node3D, index: int, surface_name: String, local_position: Vector3, size: Vector3, material: StandardMaterial3D) -> void:
+	var segment_root := _ensure_segment_node(segments_root, index)
+	_apply_segment_node(segment_root, surface_name, local_position, size, material)

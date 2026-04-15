@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PlacementCatalogItemResource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/placement_catalog_item_resource.gd" id="1_catalog_item"]
+
+[resource]
+script = ExtResource("1_catalog_item")
+id = "small_shelf"
+display_name = "Small Shelf"
+category = "Shelves"
+initial_owned = 3
+factory_type = "imported_scene"
+source_scene_path = "res://assets/props/small_shelf/small_shelf.glb"
+mount_kind = "floor"
+mount_kinds = Array[String](["floor"])
+can_host_surface_items = true

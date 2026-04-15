@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PlacementCatalogItemResource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/placement_catalog_item_resource.gd" id="1_catalog_item"]
+[ext_resource type="Script" path="res://scripts/placement/macaws_ceiling_fan_placeable.gd" id="2_item_script"]
+
+[resource]
+script = ExtResource("1_catalog_item")
+id = "ceiling_fan"
+display_name = "Ceiling Fan"
+category = "Lights"
+initial_owned = 1
+item_script = ExtResource("2_item_script")
+source_scene_path = "res://assets/props/macaws_lights/ceiling_fan/ceiling_fan.glb"
+mount_kind = "ceiling"
+mount_kinds = Array[String](["ceiling"])
+anchor_mode = "ceiling"
+preview_yaw = 0.7853982
+fan_speed_degrees_per_second = 240.0
+supports_studio_edit = true

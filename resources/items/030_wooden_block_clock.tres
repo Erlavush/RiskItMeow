@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="PlacementCatalogItemResource" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/placement_catalog_item_resource.gd" id="1_catalog_item"]
+[ext_resource type="Script" path="res://scripts/placement/wooden_block_clock_placeable.gd" id="2_item_script"]
+
+[resource]
+script = ExtResource("1_catalog_item")
+id = "wooden_block_clock"
+display_name = "Wooden Block Clock"
+category = "Electronics"
+initial_owned = 1
+item_script = ExtResource("2_item_script")
+mount_kind = "wall"
+mount_kinds = Array[String](["wall"])
+supported_wall_surfaces = Array[String](["wall_back", "wall_left", "wall_front", "wall_right"])
+visual_scale = Vector3(1, 1, 1)
+visual_y_offset = 0.0
+visual_yaw = 0.0
+preview_yaw = 3.1415927
+collision_size = Vector3(1.0, 1.45, 0.5)
+collision_center_offset = Vector3(0.0, 0.725, 0.0)
+wall_half_extents = Vector2(0.5, 0.725)
+supports_studio_edit = true
